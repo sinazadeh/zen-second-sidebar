@@ -29,6 +29,21 @@ const runAfterStartup = () => {
     delayedStartupPromise.then(run);
   } else if (typeof UC_API !== "undefined") {
     UC_API.Runtime.startupFinished().then(run);
+  } else if (typeof Services !== "undefined") {
+    const delayedStartupTopic = "browser-delayed-startup-finished";
+    const onDelayedStartup = (subject, topic) => {
+      if (topic === delayedStartupTopic && subject === window) {
+        Services.obs.removeObserver(onDelayedStartup, delayedStartupTopic);
+        run();
+      }
+    };
+    Services.obs.addObserver(onDelayedStartup, delayedStartupTopic);
+    if (window.gBrowserInit?.delayedStartupFinished) {
+      Services.obs.removeObserver(onDelayedStartup, delayedStartupTopic);
+      run();
+    }
+  } else {
+    Promise.resolve().then(run);
   }
 };
 
