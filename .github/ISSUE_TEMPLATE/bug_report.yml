@@ -48,25 +48,6 @@ body:
     validations:
       required: true
 
-  - type: dropdown
-    id: other-profiles
-    attributes:
-      label: Do other profiles on the same browser installation use a different loader?
-      description: Sine and fx-autoconfig share one bootstrap file per installation, so setting one up for another profile can disable the other here.
-      options:
-        - "No"
-        - "Yes"
-        - Not sure
-    validations:
-      required: true
-
-  - type: checkboxes
-    id: sine-unsafe-js
-    attributes:
-      label: Sine users
-      options:
-        - label: "`sine.allow-unsafe-js` is set to `true` in `about:config`"
-
   - type: textarea
     id: what-happened
     attributes:
