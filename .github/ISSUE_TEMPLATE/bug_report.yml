@@ -1,6 +1,8 @@
 name: Bug report
 description: Something in the second sidebar or its web panels doesn't work
 labels: ["bug"]
+assignees:
+  - sinazadeh
 body:
   - type: markdown
     attributes:
