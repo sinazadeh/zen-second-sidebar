@@ -12,7 +12,7 @@ on:
     - cron: "0 7 * * 3"
   workflow_dispatch:
   pull_request:
-    branches: ["master"]
+    branches: ["main"]
     paths:
       - "src/second_sidebar/patchers/**"
       - "scripts/check_patch_targets.mjs"

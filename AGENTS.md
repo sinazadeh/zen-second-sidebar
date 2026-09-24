@@ -213,6 +213,12 @@ exports.
   on." Don't assume a report of "stopped working after installing Sine" is
   about the same profile Sine was added to - ask about sibling profiles on
   the same installation before chasing a code-level cause.
+- **Default branch is `main`** (renamed from `master`; upstream still uses
+  `master`). Sine reads a mod added without `/tree/<branch>` from `main`,
+  so the plain `<owner>/<repo>` works. Older Sine installs added as
+  `<owner>/<repo>/tree/master` keep working only through GitHub's rename
+  redirect, which stops if a branch named `master` is created again - so
+  don't recreate one.
 - **Why `src/` stays**: flattening `src/second_sidebar.uc.mjs` and
   `src/second_sidebar/` to the repo root would look tidier and match how
   small single-file Sine mods are usually laid out, but this fork's `src/`
@@ -413,8 +419,9 @@ Use a dedicated test profile with fx-autoconfig (or Zen's script loader):
 
 For changes to `theme.json`, the startup fallback in `second_sidebar.uc.mjs`,
 or anything under "Loader portability" above, also install via Sine on a
-separate test profile (add the repo as `<owner>/<repo>/tree/master` - the
-explicit branch matters, see README) rather than assuming the fx-autoconfig
+separate test profile (add the repo as `<owner>/<repo>`, which Sine reads
+from the `main` branch, or `<owner>/<repo>/tree/<branch>` to test another
+branch) rather than assuming the fx-autoconfig
 path alone covers it; the two loaders serve this addon's files from different
 chrome:// origins.
 
@@ -471,14 +478,14 @@ git fetch upstream
 # 2. Check how many new commits exist
 git log HEAD..upstream/master --oneline
 
-# 3. Merge into master
-git checkout master
+# 3. Merge into main (this fork's default branch; upstream's is still master)
+git checkout main
 git merge upstream/master
 
 # 4. Resolve conflicts (see hotspots below), then:
 git add <resolved-files>
 git commit
-git push origin master
+git push origin main
 ```
 
 ### Known conflict hotspots

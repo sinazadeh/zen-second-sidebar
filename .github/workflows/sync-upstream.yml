@@ -36,8 +36,9 @@ jobs:
 
     env:
       UPSTREAM_REPO: aminought/firefox-second-sidebar
+      # Upstream still uses "master"; this fork's default branch is "main".
       UPSTREAM_BRANCH: master
-      BASE_BRANCH: master
+      BASE_BRANCH: main
       SYNC_BRANCH: sync/upstream-${{ github.run_id }}
 
     steps:
