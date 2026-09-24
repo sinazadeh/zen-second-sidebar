@@ -6,6 +6,8 @@ below (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-09-24
+
 ### Fixed
 
 - On Wayland, settings popups opened from a web panel low in the sidebar (or
