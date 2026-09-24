@@ -1,4 +1,5 @@
 import { BrowserElements } from "../browser_elements.mjs";
+import { Logger } from "../utils/logger.mjs";
 import { SidebarControllers } from "../sidebar_controllers.mjs";
 import { SidebarElements } from "../sidebar_elements.mjs";
 import { WindowWrapper } from "../wrappers/window.mjs";
@@ -17,6 +18,7 @@ export class SidebarMainCollapser {
     this.lastOpenedWebPanel = null;
     this.showSidebarTimer = null;
     this.hideSidebarTimer = null;
+    this.lastBlockingButtons = "";
     this.#setupListeners();
   }
 
@@ -126,6 +128,7 @@ export class SidebarMainCollapser {
     const openedButtons = SidebarElements.sidebarMain.querySelectorAll(
       "toolbarbutton:not(.sb2-main-web-panel-button)[open]",
     );
+    this.#logBlockingButtons(openedButtons);
     if (openedButtons.length > 0) {
       return;
     }
@@ -164,11 +167,79 @@ export class SidebarMainCollapser {
         ((isRight && event.screenX > rightEdge - sidebarRect.width) ||
           (isLeft && event.screenX < leftEdge + sidebarRect.width)));
 
+    const hitTest = { isRight, collapsed, leftEdge, rightEdge, sidebarRect };
     if (isInUncollapseArea) {
+      if (collapsed && !this.showSidebarTimer) {
+        this.#logHoverDecision("show", event, hitTest);
+      }
       this.uncollapse();
     } else if (!this.isPanelOpened()) {
+      if (!collapsed && !this.hideSidebarTimer) {
+        this.#logHoverDecision("hide", event, hitTest);
+      }
       this.collapse();
     }
+  }
+
+  /**
+   * Debug-only record of what auto-hide based a show/hide decision on, in
+   * screen pixels, so a report of it triggering in the wrong place can be
+   * diagnosed from the Browser Console.
+   *
+   * @param {string} action
+   * @param {MouseEvent} event
+   * @param {object} hitTest
+   * @param {boolean} hitTest.isRight
+   * @param {boolean} hitTest.collapsed
+   * @param {number} hitTest.leftEdge
+   * @param {number} hitTest.rightEdge
+   * @param {DOMRect} hitTest.sidebarRect
+   */
+  #logHoverDecision(
+    action,
+    event,
+    { isRight, collapsed, leftEdge, rightEdge, sidebarRect },
+  ) {
+    if (!Logger.enabled) {
+      return;
+    }
+    const zoneWidth = collapsed ? TRIGGER_WIDTH : sidebarRect.width;
+    const zone = isRight
+      ? [rightEdge - zoneWidth, rightEdge]
+      : [leftEdge, leftEdge + zoneWidth];
+    const sidebar = [leftEdge + sidebarRect.left, leftEdge + sidebarRect.right];
+    const range = ([start, end]) => `${Math.round(start)}-${Math.round(end)}`;
+    const target = event.target;
+    const targetName = `${target?.localName ?? "?"}${target?.id ? "#" + target.id : ""}`;
+    const view =
+      event.view === window ? "browser window" : (event.view?.name ?? "?");
+    Logger.debug(
+      `Auto-hide: ${action} sidebar on ${event.type} at screenX ` +
+        `${Math.round(event.screenX)}; zone ${range(zone)}, window ` +
+        `${range([leftEdge, rightEdge])}, sidebar ${range(sidebar)}, ` +
+        `target ${targetName} in ${view}`,
+    );
+  }
+
+  /**
+   * Debug-only record of sidebar buttons whose open popup keeps auto-hide
+   * from reacting to the mouse, logged when that set changes.
+   *
+   * @param {NodeList} openedButtons
+   */
+  #logBlockingButtons(openedButtons) {
+    const ids = [...openedButtons]
+      .map((button) => button.id || button.localName)
+      .join(", ");
+    if (ids === this.lastBlockingButtons) {
+      return;
+    }
+    this.lastBlockingButtons = ids;
+    Logger.debug(
+      ids
+        ? `Auto-hide: paused while open: ${ids}`
+        : "Auto-hide: resumed after popup closed",
+    );
   }
 
   /**
