@@ -1,3 +1,11 @@
+import { Logger } from "../utils/logger.mjs";
+import { reportUnappliedPatches } from "./source_patches.mjs";
+
+// How often and for how long to wait for gURLBar.valueFormatter to appear
+// (see #patchValueFormatterUpdate): 600 * 50ms = 30s.
+const VALUE_FORMATTER_RETRY_MS = 50;
+const VALUE_FORMATTER_MAX_ATTEMPTS = 600;
+
 export class UrlbarInputPatcher {
   static patch() {
     console.log("Patching #urlbar-input...");
@@ -17,7 +25,12 @@ export class UrlbarInputPatcher {
   static #patchTabSwitchFocusChange() {
     const urlbar = window[1].gURLBar;
     const afterTabSelectAndFocusChange = urlbar._afterTabSelectAndFocusChange;
-    if (typeof afterTabSelectAndFocusChange !== "function") return;
+    if (typeof afterTabSelectAndFocusChange !== "function") {
+      reportUnappliedPatches("UrlbarInput", [
+        "skip the tab-switch focus handler while the hidden urlbar has no view",
+      ]);
+      return;
+    }
 
     urlbar._afterTabSelectAndFocusChange = function (...args) {
       // The hidden urlbar may have no view. Its focus handler must not
@@ -39,7 +52,13 @@ export class UrlbarInputPatcher {
    *
    * gURLBar.valueFormatter doesn't exist yet when patch() runs (it fires on
    * browser-window-before-show, before Firefox creates gURLBar), so retry
-   * until it does.
+   * until it does - but not forever, in case a browser update renamed it.
+   *
+   * Newer Firefox (where gURLBar is a <moz-urlbar> element) keeps the
+   * formatter private and makes update() async, so it can no longer throw
+   * synchronously inside removeTab() and there is nothing to patch: the
+   * rejected promise it leaves behind is filtered by
+   * #suppressValueFormatterErrors.
    */
   static #patchValueFormatterUpdate() {
     const childWindow = window[1];
@@ -52,9 +71,22 @@ export class UrlbarInputPatcher {
         );
         return;
       }
-      const valueFormatter = childWindow.gURLBar?.valueFormatter;
+      const urlbar = childWindow.gURLBar;
+      if (urlbar?.localName === "moz-urlbar" && !("valueFormatter" in urlbar)) {
+        Logger.debug(
+          "UrlbarValueFormatter patch not needed: the formatter is private and update() is async",
+        );
+        return;
+      }
+      const valueFormatter = urlbar?.valueFormatter;
       if (typeof valueFormatter?.update !== "function") {
-        setTimeout(tryPatch, 50);
+        if (attempts >= VALUE_FORMATTER_MAX_ATTEMPTS) {
+          reportUnappliedPatches("UrlbarInput", [
+            "make UrlbarValueFormatter.update a no-op: gURLBar.valueFormatter.update never appeared",
+          ]);
+          return;
+        }
+        setTimeout(tryPatch, VALUE_FORMATTER_RETRY_MS);
         return;
       }
       valueFormatter.update = async () => {};

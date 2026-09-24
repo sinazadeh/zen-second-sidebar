@@ -1,4 +1,8 @@
-import { removePatchedModule, writePatchedModule } from "../utils/files.mjs";
+import { fetchFirstAvailable, importPatchedModule } from "../utils/files.mjs";
+import {
+  patchPopupNotificationsSource,
+  reportUnappliedPatches,
+} from "./source_patches.mjs";
 
 const MODULE_URL = "resource://gre/modules/PopupNotifications.sys.mjs";
 const PATCHED_MODULE_RELATIVE_PATH = "fss/PopupNotifications.sys.mjs";
@@ -6,31 +10,32 @@ const PATCHED_MODULE_RELATIVE_PATH = "fss/PopupNotifications.sys.mjs";
 export class PopupNotificationsPatcher {
   static patch() {
     console.log("Patching PopupNotifications.sys.mjs...");
-    fetch(MODULE_URL)
-      .then(async (response) => {
-        let moduleSource = await response.text();
-        moduleSource = this.#patchModuleSource(moduleSource);
-        await this.#replaceModule(moduleSource);
-      })
-      .catch(console.error);
-    console.log("PopupNotifications.sys.mjs was patched");
-  }
-
-  static #patchModuleSource(moduleSource) {
-    return moduleSource
-      .replace(/(let isActiveBrowser = ).+/gm, "$1true;")
-      .replace(/(let isActiveWindow = ).+/gm, "$1true;")
-      .replace(/(this\.window\.focus\(\);)\s+return;/gm, "$1");
-  }
-
-  static async #replaceModule(moduleSource) {
-    const chromePath = await writePatchedModule(
-      PATCHED_MODULE_RELATIVE_PATH,
-      moduleSource,
+    this.#patch().then(
+      (complete) =>
+        console.log(
+          complete
+            ? "PopupNotifications.sys.mjs was patched"
+            : "PopupNotifications.sys.mjs was only partly patched (see the warning above)",
+        ),
+      (error) =>
+        console.error("Failed to patch PopupNotifications.sys.mjs:", error),
     );
-    const module = await import(chromePath);
+  }
+
+  /**
+   * @returns {Promise<boolean>} false if any patch no longer applies
+   */
+  static async #patch() {
+    const { source, unmatched } = patchPopupNotificationsSource(
+      await fetchFirstAvailable([MODULE_URL]),
+    );
+    reportUnappliedPatches("PopupNotifications.sys.mjs", unmatched);
+    const module = await importPatchedModule(
+      PATCHED_MODULE_RELATIVE_PATH,
+      source,
+    );
     this.#defineLazyGetter(module);
-    await removePatchedModule(PATCHED_MODULE_RELATIVE_PATH);
+    return unmatched.length === 0;
   }
 
   /**
