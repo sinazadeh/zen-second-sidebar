@@ -7,8 +7,13 @@ export const POPUPS_CSS = `
     /* Keep tall popups (e.g. a floating panel's extra geometry rows) inside
        the window: Firefox's own popup size constraint doesn't hold on every
        platform/compositor, and without a cap the footer with its Save button
-       ends up off-screen. Only the body shrinks and scrolls. */
-    max-height: calc(100vh - 2 * var(--space-xlarge, 24px));
+       ends up off-screen. --sb2-popup-max-height narrows this to the room
+       beside the popup's anchor where needed (see
+       Panel#openPopupWithinWindow). Only the body shrinks and scrolls. */
+    max-height: min(
+      calc(100vh - 2 * var(--space-xlarge, 24px)),
+      var(--sb2-popup-max-height, 100vh)
+    );
 
     .sb2-popup-header {
       flex-shrink: 0;

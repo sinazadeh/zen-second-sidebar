@@ -783,7 +783,10 @@ export class WebPanelPopupEdit extends Panel {
     this.addEventListener("popuphidden", this.closeOnPopupHidden);
     window.addEventListener("keydown", this.escapeOnKeyDown, true);
 
-    return Panel.prototype.openPopup.call(this, webPanelController.button);
+    return Panel.prototype.openPopupWithinWindow.call(
+      this,
+      webPanelController.button,
+    );
   }
 
   #requestClose() {

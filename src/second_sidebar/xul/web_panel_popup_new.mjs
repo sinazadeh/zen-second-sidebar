@@ -124,6 +124,6 @@ export class WebPanelPopupNew extends Panel {
 
     this.temporaryToggle.setPressed(false);
 
-    return Panel.prototype.openPopup.call(this, target);
+    return Panel.prototype.openPopupWithinWindow.call(this, target);
   }
 }
