@@ -240,6 +240,12 @@ exports.
   panels. Its startup observers, SessionStore handling, close commands, popup
   notifications, and URL-bar patches are part of the implementation.
   Validate changes to this code in a real browser instance.
+- Mouse events inside a web panel bubble from that nested window up to the
+  main window's listeners (its `<browser>` is the nested window's chrome
+  event handler), so `event.target` can belong to the panel's document (see
+  `WebPanelsBrowser#activeWebPanelContains`). Their `screenX` isn't in the
+  main window's coordinates, though (issue #10): map such events through
+  the embedded browser's box, as `SidebarMainCollapser#getScreenX` does.
 - Every web panel tab is created with `tab.setUndiscardable(true)`
   (`xul/base/tab.mjs`) so Firefox's automatic memory-pressure tab unloader
   can't silently discard one out from under `WebPanelController`'s own
