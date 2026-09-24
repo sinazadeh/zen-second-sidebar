@@ -1,0 +1,63 @@
+# Publishes a GitHub release when a version tag is pushed:
+#
+#   git tag v1.2.0 && git push origin v1.2.0
+#
+# The tag must match the version in theme.json. The release notes come from
+# that version's section in CHANGELOG.md (or GitHub's generated notes if
+# there isn't one), and the release carries a zip of src/ for fx-autoconfig
+# users. Sine users keep installing from the repository as before.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  release:
+    name: Publish release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Check the tag matches theme.json
+        id: version
+        run: |
+          VERSION=$(node -p "require('./theme.json').version")
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match theme.json version $VERSION"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build fx-autoconfig archive
+        run: |
+          cd src
+          zip -r "../zen-second-sidebar-enhanced-$GITHUB_REF_NAME.zip" \
+            second_sidebar.uc.mjs second_sidebar -x "second_sidebar/fss/*"
+
+      - name: Extract release notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          awk -v heading="## [$VERSION]" '
+            index($0, heading) == 1 { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -s release-notes.md ]; then
+            NOTES=(--notes-file release-notes.md)
+          else
+            NOTES=(--generate-notes)
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            "zen-second-sidebar-enhanced-$GITHUB_REF_NAME.zip" \
+            --title "$GITHUB_REF_NAME" "${NOTES[@]}"

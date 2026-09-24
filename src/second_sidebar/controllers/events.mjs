@@ -62,6 +62,7 @@ export const SidebarEvents = {
   RESET_SIDEBAR_FLOATING_WIDTH: "reset_sidebar_floating_width",
   RESET_SIDEBAR_FLOATING_HEIGHT: "reset_sidebar_floating_height",
   RESET_SIDEBAR_FLOATING_ALL: "reset_sidebar_floating_all",
+  SUSPEND_SETTINGS_SAVES: "suspend_settings_saves",
 };
 
 /**

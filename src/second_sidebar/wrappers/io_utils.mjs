@@ -34,4 +34,13 @@ export class IOUtilsWrapper {
   static async remove(path) {
     await IOUtils.remove(path);
   }
+
+  /**
+   *
+   * @param {string} sourcePath
+   * @param {string} destPath
+   */
+  static async copy(sourcePath, destPath) {
+    await IOUtils.copy(sourcePath, destPath);
+  }
 }

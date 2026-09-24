@@ -7,6 +7,7 @@ import {
 
 import { NetUtilWrapper } from "../wrappers/net_utils.mjs";
 import { ChromeUtilsWrapper } from "../wrappers/chrome_utils.mjs";
+import { Logger } from "../utils/logger.mjs";
 import { SidebarControllers } from "../sidebar_controllers.mjs";
 import { SidebarElements } from "../sidebar_elements.mjs";
 import { WebPanelController } from "./web_panel.mjs";
@@ -27,6 +28,13 @@ export class WebPanelsController {
   #saveSettingsTimer = null;
   /**@type {number?} */
   #saveStateTimer = null;
+  #settingsSavesSuspended = false;
+  /**@type {number?} */
+  #urlTimeout = null;
+  /**@type {number?} */
+  #selectorTimeout = null;
+  /**@type {number?} */
+  #faviconURLTimeout = null;
 
   constructor() {
     /**@type {Map<string, WebPanelController>} */
@@ -35,6 +43,15 @@ export class WebPanelsController {
     this.lastOpenedWebPanelUUID = null;
     this.#setupListeners();
     this.#setupMainBrowserListener();
+    // A debounced save still pending when the window closes would otherwise
+    // be lost along with the window's timers.
+    new WindowWrapper().addEventListener("unload", () => {
+      try {
+        this.#flushPendingSaves();
+      } catch (error) {
+        console.error("Failed to flush pending web panel saves:", error);
+      }
+    });
   }
 
   #setupListeners() {
@@ -128,11 +145,14 @@ export class WebPanelsController {
       if (temporary) {
         if (isActiveWindow) {
           const webPanelController = await create();
+          // null for an invalid url (see createWebPanelController)
+          if (!webPanelController) return;
           webPanelController.switchWebPanel();
           setTimeout(() => this.#unwrapButtons(), 100);
         }
       } else {
         const webPanelController = await create();
+        if (!webPanelController) return;
         if (isActiveWindow) {
           webPanelController.switchWebPanel();
         }
@@ -140,22 +160,26 @@ export class WebPanelsController {
       }
     });
 
-    listenEvent(WebPanelEvents.EDIT_WEB_PANEL_URL, (event) => {
-      const uuid = event.detail.uuid;
-      const url = event.detail.url;
-      const timeout = event.detail.timeout;
-
-      const webPanelController = this.get(uuid);
-      const oldUrl = webPanelController.getURL();
-      webPanelController.setURL(url);
-
-      clearTimeout(this.urlTimeout);
-      this.urlTimeout = setTimeout(() => {
-        if (!webPanelController.isUnloaded() && oldUrl !== url) {
-          webPanelController.go(url);
-        }
-      }, timeout);
+    listenEvent(SidebarEvents.SUSPEND_SETTINGS_SAVES, () => {
+      this.#settingsSavesSuspended = true;
+      clearTimeout(this.#saveSettingsTimer);
+      this.#saveSettingsTimer = null;
     });
+
+    this.#listenWebPanelEvent(
+      WebPanelEvents.EDIT_WEB_PANEL_URL,
+      (webPanelController, { url, timeout }) => {
+        const oldUrl = webPanelController.getURL();
+        webPanelController.setURL(url);
+
+        clearTimeout(this.#urlTimeout);
+        this.#urlTimeout = setTimeout(() => {
+          if (!webPanelController.isUnloaded() && oldUrl !== url) {
+            webPanelController.go(url);
+          }
+        }, timeout);
+      },
+    );
 
     this.#bindSimpleSetting(
       WebPanelEvents.EDIT_WEB_PANEL_TITLE,
@@ -164,63 +188,65 @@ export class WebPanelsController {
       { onChanged: (webPanelController) => webPanelController.updateTitle() },
     );
 
-    listenEvent(WebPanelEvents.EDIT_WEB_PANEL_FAVICON_URL, (event) => {
-      const { uuid, dynamicFavicon, faviconURL, timeout } = event.detail;
+    this.#listenWebPanelEvent(
+      WebPanelEvents.EDIT_WEB_PANEL_FAVICON_URL,
+      (webPanelController, { dynamicFavicon, faviconURL, timeout }) => {
+        webPanelController.setFaviconURL(dynamicFavicon, faviconURL);
 
-      const webPanelController = this.get(uuid);
-      webPanelController.setFaviconURL(dynamicFavicon, faviconURL);
+        clearTimeout(this.#faviconURLTimeout);
+        this.#faviconURLTimeout = setTimeout(() => {
+          webPanelController.updateFavicon();
+        }, timeout);
+      },
+    );
 
-      clearTimeout(this.faviconURLTimeout);
-      this.faviconURLTimeout = setTimeout(() => {
-        webPanelController.updateFavicon();
-      }, timeout);
-    });
+    this.#listenWebPanelEvent(
+      WebPanelEvents.EDIT_WEB_PANEL_SELECTOR_ENABLED,
+      (webPanelController, { selectorEnabled }) => {
+        const oldSelectorEnabled = webPanelController.getSelectorEnabled();
+        webPanelController.setSelectorEnabled(selectorEnabled);
 
-    listenEvent(WebPanelEvents.EDIT_WEB_PANEL_SELECTOR_ENABLED, (event) => {
-      const uuid = event.detail.uuid;
-      const selectorEnabled = event.detail.selectorEnabled;
-
-      const webPanelController = this.get(uuid);
-      const oldSelectorEnabled = webPanelController.getSelectorEnabled();
-      webPanelController.setSelectorEnabled(selectorEnabled);
-
-      if (
-        !webPanelController.isUnloaded() &&
-        oldSelectorEnabled !== selectorEnabled
-      ) {
-        webPanelController.reload();
-      }
-    });
-
-    listenEvent(WebPanelEvents.EDIT_WEB_PANEL_SELECTOR, (event) => {
-      const uuid = event.detail.uuid;
-      const selector = event.detail.selector;
-      const timeout = event.detail.timeout;
-
-      const webPanelController = this.get(uuid);
-      const oldSelector = webPanelController.getSelector();
-      webPanelController.setSelector(selector);
-
-      clearTimeout(this.urlTimeout);
-      this.urlTimeout = setTimeout(() => {
-        if (!webPanelController.isUnloaded() && oldSelector !== selector) {
+        if (
+          !webPanelController.isUnloaded() &&
+          oldSelectorEnabled !== selectorEnabled
+        ) {
           webPanelController.reload();
         }
-      }, timeout);
-    });
+      },
+    );
 
-    listenEvent(WebPanelEvents.EDIT_WEB_PANEL_PINNED, (event) => {
-      const uuid = event.detail.uuid;
-      const pinned = event.detail.pinned;
+    this.#listenWebPanelEvent(
+      WebPanelEvents.EDIT_WEB_PANEL_SELECTOR,
+      (webPanelController, { selector, timeout }) => {
+        const oldSelector = webPanelController.getSelector();
+        webPanelController.setSelector(selector);
 
-      const webPanelController = this.get(uuid);
-      pinned ? webPanelController.pin() : webPanelController.unpin();
+        // Separate from #urlTimeout so editing the selector right after the
+        // URL doesn't cancel the pending navigation to the new URL.
+        clearTimeout(this.#selectorTimeout);
+        this.#selectorTimeout = setTimeout(() => {
+          if (!webPanelController.isUnloaded() && oldSelector !== selector) {
+            webPanelController.reload();
+          }
+        }, timeout);
+      },
+    );
 
-      if (webPanelController.isActive()) {
-        SidebarControllers.sidebarController.updatePinState(webPanelController);
-        SidebarControllers.sidebarController.updateToolbar(webPanelController);
-      }
-    });
+    this.#listenWebPanelEvent(
+      WebPanelEvents.EDIT_WEB_PANEL_PINNED,
+      (webPanelController, { pinned }) => {
+        pinned ? webPanelController.pin() : webPanelController.unpin();
+
+        if (webPanelController.isActive()) {
+          SidebarControllers.sidebarController.updatePinState(
+            webPanelController,
+          );
+          SidebarControllers.sidebarController.updateToolbar(
+            webPanelController,
+          );
+        }
+      },
+    );
 
     // The five floating-geometry settings below all follow the same shape:
     // apply the setter, then recalculate on-screen geometry if the panel is
@@ -332,15 +358,37 @@ export class WebPanelsController {
       "setZoom",
     );
 
-    listenEvent(WebPanelEvents.DELETE_WEB_PANEL, async (event) => {
-      const uuid = event.detail.uuid;
+    this.#listenWebPanelEvent(
+      WebPanelEvents.DELETE_WEB_PANEL,
+      (webPanelController, { uuid }) => {
+        if (webPanelController.isActive()) {
+          SidebarControllers.sidebarController.close();
+        }
+        webPanelController.remove();
+        this.delete(uuid);
+      },
+    );
+  }
 
-      const webPanelController = this.get(uuid);
-      if (webPanelController.isActive()) {
-        SidebarControllers.sidebarController.close();
+  /**
+   * Listens for an event aimed at one web panel (`event.detail.uuid`) and
+   * hands the callback that panel's controller. Events are sent to every
+   * window, but temporary panels only exist in the window that created
+   * them, so a window without the target panel ignores the event.
+   *
+   * @param {string} event
+   * @param {function(WebPanelController, object):void} callback
+   */
+  #listenWebPanelEvent(event, callback) {
+    listenEvent(event, (e) => {
+      const webPanelController = this.get(e.detail.uuid);
+      if (!webPanelController) {
+        Logger.debug(
+          `Ignoring ${event}: web panel ${e.detail.uuid} is not in this window`,
+        );
+        return;
       }
-      webPanelController.remove();
-      this.delete(uuid);
+      callback(webPanelController, e.detail);
     });
   }
 
@@ -360,10 +408,9 @@ export class WebPanelsController {
    */
   #bindSimpleSetting(event, valueKeys, setterName, { onChanged } = {}) {
     const keys = Array.isArray(valueKeys) ? valueKeys : [valueKeys];
-    listenEvent(event, (e) => {
-      const webPanelController = this.get(e.detail.uuid);
-      webPanelController[setterName](...keys.map((key) => e.detail[key]));
-      onChanged?.(webPanelController, e.detail);
+    this.#listenWebPanelEvent(event, (webPanelController, detail) => {
+      webPanelController[setterName](...keys.map((key) => detail[key]));
+      onChanged?.(webPanelController, detail);
     });
   }
 
@@ -397,8 +444,8 @@ export class WebPanelsController {
    * @param {string} methodName
    */
   #bindSimpleAction(event, methodName) {
-    listenEvent(event, (e) => {
-      this.get(e.detail.uuid)[methodName]();
+    this.#listenWebPanelEvent(event, (webPanelController) => {
+      webPanelController[methodName]();
     });
   }
 
@@ -518,7 +565,7 @@ export class WebPanelsController {
    * @param {boolean} temporary
    * @param {string} newWebPanelPosition
    * @param {boolean} isActiveWindow
-   * @returns {Promise<WebPanelController>}
+   * @returns {Promise<WebPanelController?>} null if `url` is invalid
    */
   async createWebPanelController(
     uuid,
@@ -531,8 +578,8 @@ export class WebPanelsController {
     try {
       NetUtilWrapper.newURI(url);
     } catch (error) {
-      console.log("Invalid url:", error);
-      return;
+      console.warn("Invalid web panel url:", url, error);
+      return null;
     }
 
     const webPanelSettings = new WebPanelSettings(
@@ -676,13 +723,26 @@ export class WebPanelsController {
   }
 
   saveSettings() {
+    // Set while an import is pending a restart (see
+    // SidebarMainSettingsController#importSettings): this window's panels
+    // predate the import, so saving them would silently undo it.
+    if (this.#settingsSavesSuspended) {
+      Logger.debug("Web panels settings save skipped: import pending restart");
+      return;
+    }
     // Coalesce bursts of settings changes (drag/resize end, multiple edits) into one write.
     clearTimeout(this.#saveSettingsTimer);
-    this.#saveSettingsTimer = setTimeout(() => {
-      this.dumpSettings()
-        .save()
-        .catch((error) => console.error("Failed to save web panels:", error));
-    }, SAVE_DEBOUNCE_MS);
+    this.#saveSettingsTimer = setTimeout(
+      () => this.#writeSettings(),
+      SAVE_DEBOUNCE_MS,
+    );
+  }
+
+  #writeSettings() {
+    this.#saveSettingsTimer = null;
+    this.dumpSettings()
+      .save()
+      .catch((error) => console.error("Failed to save web panels:", error));
   }
 
   dumpState() {
@@ -696,12 +756,29 @@ export class WebPanelsController {
   saveState() {
     // Coalesce state saves so multiple panels finishing navigation close together only write once.
     clearTimeout(this.#saveStateTimer);
-    this.#saveStateTimer = setTimeout(() => {
-      this.dumpState()
-        .save()
-        .catch((error) =>
-          console.error("Failed to save web panels state:", error),
-        );
-    }, SAVE_DEBOUNCE_MS);
+    this.#saveStateTimer = setTimeout(
+      () => this.#writeState(),
+      SAVE_DEBOUNCE_MS,
+    );
+  }
+
+  #writeState() {
+    this.#saveStateTimer = null;
+    this.dumpState()
+      .save()
+      .catch((error) =>
+        console.error("Failed to save web panels state:", error),
+      );
+  }
+
+  #flushPendingSaves() {
+    if (this.#saveSettingsTimer !== null) {
+      clearTimeout(this.#saveSettingsTimer);
+      this.#writeSettings();
+    }
+    if (this.#saveStateTimer !== null) {
+      clearTimeout(this.#saveStateTimer);
+      this.#writeState();
+    }
   }
 }

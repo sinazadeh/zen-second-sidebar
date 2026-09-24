@@ -50,6 +50,28 @@ export async function removeFile(relativePath) {
 }
 
 /**
+ * Copies a data file next to itself under a timestamped name, e.g.
+ * `web-panels.json` -> `web-panels.corrupt-2026-09-24T10-00-00-000Z.json`.
+ *
+ * @param {string} relativePath
+ * @param {string} label
+ * @returns {Promise<string>} the copy's relative path
+ */
+export async function backupFile(relativePath, label) {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const extensionIndex = relativePath.lastIndexOf(".");
+  const backupPath =
+    extensionIndex > relativePath.lastIndexOf("/")
+      ? `${relativePath.slice(0, extensionIndex)}.${label}-${timestamp}${relativePath.slice(extensionIndex)}`
+      : `${relativePath}.${label}-${timestamp}`;
+  await IOUtilsWrapper.copy(
+    makeDataPath(relativePath),
+    makeDataPath(backupPath),
+  );
+  return backupPath;
+}
+
+/**
  *
  * @param {string} relativePath
  * @returns {string}
@@ -122,24 +144,63 @@ export async function migrateLegacyFile(relativePath) {
 const SECOND_SIDEBAR_ROOT_URL = new URL("../", import.meta.url).href;
 
 /**
+ * Fetches the first of `urls` that loads (e.g. a Firefox module that moved
+ * between versions), without logging an error for the ones that don't.
  *
- * @param {string} relativePath
- * @param {string} data
- * @returns {Promise<string>} a URL the written file can be dynamically imported from
+ * @param {Array<string>} urls
+ * @returns {Promise<string>}
  */
-export async function writePatchedModule(relativePath, data) {
-  const path = makeSelfPath(relativePath);
-  await IOUtilsWrapper.writeUTF8(path, data);
-  return new URL(relativePath, SECOND_SIDEBAR_ROOT_URL).href;
+export async function fetchFirstAvailable(urls) {
+  const failures = [];
+  for (const url of urls) {
+    try {
+      const response = await fetch(url);
+      return await response.text();
+    } catch (error) {
+      failures.push(`${url}: ${error.message}`);
+    }
+  }
+  throw new Error(`Could not load any of: ${failures.join("; ")}`);
 }
 
 /**
+ * Writes `data` as a temporary module next to this addon's own files,
+ * imports it and deletes the file again. Every window runs the patchers, so
+ * each call gets its own file name: with a shared name, one window (e.g. of
+ * several restored at startup) could delete the file while another is
+ * still importing it.
+ *
+ * @param {string} relativePath e.g. "fss/CustomizeMode.sys.mjs"; a unique
+ *   suffix is added before the extension
+ * @param {string} data
+ * @returns {Promise<object>} the imported module namespace
+ */
+export async function importPatchedModule(relativePath, data) {
+  const uniquePath = makeUniquePath(relativePath);
+  const path = makeSelfPath(uniquePath);
+  await IOUtilsWrapper.writeUTF8(path, data);
+  try {
+    return await import(new URL(uniquePath, SECOND_SIDEBAR_ROOT_URL).href);
+  } finally {
+    await IOUtilsWrapper.remove(path).catch((error) =>
+      console.error(`Failed to remove temporary module "${path}":`, error),
+    );
+  }
+}
+
+/**
+ * "fss/CustomizeMode.sys.mjs" -> "fss/CustomizeMode.1a2b3c4d.sys.mjs"
  *
  * @param {string} relativePath
+ * @returns {string}
  */
-export async function removePatchedModule(relativePath) {
-  const path = makeSelfPath(relativePath);
-  await IOUtilsWrapper.remove(path);
+function makeUniquePath(relativePath) {
+  const nameStart = relativePath.lastIndexOf("/") + 1;
+  const extensionStart = relativePath.indexOf(".", nameStart);
+  const id = crypto.randomUUID().slice(0, 8);
+  return extensionStart === -1
+    ? `${relativePath}.${id}`
+    : `${relativePath.slice(0, extensionStart)}.${id}${relativePath.slice(extensionStart)}`;
 }
 
 /**

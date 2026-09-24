@@ -35,5 +35,12 @@ export default [
       },
     },
   },
+  {
+    // Development-only scripts and unit tests run in Node, not the browser.
+    files: ["scripts/**/*.mjs", "tests/**/*.mjs"],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
   pluginJs.configs.recommended,
 ];

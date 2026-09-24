@@ -1,0 +1,84 @@
+name: Bug report
+description: Something in the second sidebar or its web panels doesn't work
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! If the sidebar doesn't appear at all, please check [Troubleshooting](https://github.com/sinazadeh/zen-second-sidebar-enhanced#troubleshooting) first; most "nothing happens" cases are covered there.
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Zen Browser
+        - Firefox
+        - Other Firefox-based browser
+    validations:
+      required: true
+
+  - type: input
+    id: browser-version
+    attributes:
+      label: Browser version
+      description: From `about:support` → Application Basics → Version.
+      placeholder: e.g. Zen 1.22.2b
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      description: Include the window manager or compositor on Linux.
+      placeholder: e.g. Windows 11, macOS 15, Arch Linux + Niri
+    validations:
+      required: true
+
+  - type: dropdown
+    id: loader
+    attributes:
+      label: How is Second Sidebar installed?
+      options:
+        - Sine mod
+        - fx-autoconfig (copied into chrome/JS/)
+        - Both / not sure
+        - Other script loader
+    validations:
+      required: true
+
+  - type: dropdown
+    id: other-profiles
+    attributes:
+      label: Do other profiles on the same browser installation use a different loader?
+      description: Sine and fx-autoconfig share one bootstrap file per installation, so setting one up for another profile can disable the other here.
+      options:
+        - "No"
+        - "Yes"
+        - Not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: sine-unsafe-js
+    attributes:
+      label: Sine users
+      options:
+        - label: "`sine.allow-unsafe-js` is set to `true` in `about:config`"
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Steps to reproduce, what you expected, and what happened instead. Screenshots help, especially for layout problems.
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Browser Console output
+      description: |
+        Set `second-sidebar.debug-logging` to `true` in `about:config`, reproduce the problem, then copy the relevant lines from the Browser Console (`Ctrl+Shift+J` / `Cmd+Shift+J`). Warnings mentioning "patch no longer applies" are especially useful.
+      render: text

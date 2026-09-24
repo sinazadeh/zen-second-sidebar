@@ -15,10 +15,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check formatting
-        uses: creyD/prettier_action@v4.3
+        uses: creyD/prettier_action@v4.6
         with:
           dry: True
-          prettier_options: --write **/*.{js,mjs,md,yml}
+          # Keep in sync with the local setup command in AGENTS.md so local
+          # and CI formatting never disagree.
+          prettier_version: 3.9.9
+          prettier_options: --write **/*.{js,mjs,md,yml,json}

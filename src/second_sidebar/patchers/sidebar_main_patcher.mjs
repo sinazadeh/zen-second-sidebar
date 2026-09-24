@@ -1,4 +1,8 @@
-import { removePatchedModule, writePatchedModule } from "../utils/files.mjs";
+import { fetchFirstAvailable, importPatchedModule } from "../utils/files.mjs";
+import {
+  extractToolboxEventHandlers,
+  reportUnappliedPatches,
+} from "./source_patches.mjs";
 
 import { SidebarElements } from "../sidebar_elements.mjs";
 
@@ -8,35 +12,32 @@ const PATCHED_MODULE_RELATIVE_PATH = "fss/navigator-toolbox.mjs";
 export class SidebarMainPatcher {
   static patch() {
     console.log("Patching #sb2-main...");
-    fetch(MODULE_URL)
-      .then(async (response) => {
-        let moduleSource = await response.text();
-        moduleSource = this.#patchModuleSource(moduleSource);
-        await this.#reuseModule(moduleSource);
-      })
-      .catch(console.error);
-    console.log("#sb2-main was patched");
+    this.#patch().then(
+      (complete) =>
+        console.log(
+          complete
+            ? "#sb2-main was patched"
+            : "#sb2-main was only partly patched (see the warning above)",
+        ),
+      (error) => console.error("Failed to patch #sb2-main:", error),
+    );
   }
 
   /**
-   * @param {string} moduleSource
-   * @returns {string}
+   * @returns {Promise<boolean>} false if any patch no longer applies
    */
-  static #patchModuleSource(moduleSource) {
-    const matches = moduleSource.matchAll(/\s{4}function.*?^\s{4}}/gms);
-    return Array.from(matches)
-      .map((match) => match[0].replace(/\s{4}function/gm, "export function"))
-      .join("\n");
-  }
-
-  static async #reuseModule(moduleSource) {
-    const chromePath = await writePatchedModule(
-      PATCHED_MODULE_RELATIVE_PATH,
-      moduleSource,
+  static async #patch() {
+    const { source, unmatched } = extractToolboxEventHandlers(
+      await fetchFirstAvailable([MODULE_URL]),
     );
-    const module = await import(chromePath);
+    reportUnappliedPatches("navigator-toolbox.js", unmatched);
+    if (unmatched.length > 0) return false;
+    const module = await importPatchedModule(
+      PATCHED_MODULE_RELATIVE_PATH,
+      source,
+    );
     this.#addListeners(module);
-    await removePatchedModule(PATCHED_MODULE_RELATIVE_PATH);
+    return true;
   }
 
   /**

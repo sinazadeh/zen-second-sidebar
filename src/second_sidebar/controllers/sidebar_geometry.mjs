@@ -24,6 +24,8 @@ export class SidebarGeometry {
 
       const webPanelController =
         SidebarControllers.webPanelsController.get(uuid);
+      // Temporary panels only exist in the window that created them.
+      if (!webPanelController) return;
       webPanelController.setPinnedGeometry(width);
       if (webPanelController.isActive()) {
         this.setPinnedGeometry(width);
@@ -35,6 +37,8 @@ export class SidebarGeometry {
 
       const webPanelController =
         SidebarControllers.webPanelsController.get(uuid);
+      // Temporary panels only exist in the window that created them.
+      if (!webPanelController) return;
       webPanelController.setFloatingGeometry(geometry);
       if (webPanelController.isActive()) {
         this.setFloatingGeometry(geometry);
@@ -275,6 +279,8 @@ export class SidebarGeometry {
     { resetPosition = false, resetWidth = false, resetHeight = false } = {},
   ) {
     const webPanelController = SidebarControllers.webPanelsController.get(uuid);
+    // Temporary panels only exist in the window that created them.
+    if (!webPanelController) return;
     const position = SidebarElements.sidebarWrapper.getPosition();
     const geometry = webPanelController.getFloatingGeometry();
     const defaultOffset = this.getDefaultFloatingOffsetCSS();
