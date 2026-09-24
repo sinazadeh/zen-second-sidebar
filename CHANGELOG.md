@@ -6,6 +6,8 @@ below (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-09-24
+
 ### Fixed
 
 - With auto-hide on, moving the mouse over an open web panel showed the
