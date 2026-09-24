@@ -31,8 +31,11 @@ All paths below are relative to `src/second_sidebar/`, except the entry point.
 | `settings/`                                    | Defaults, serialization, persisted settings, and panel state.                             |
 | `wrappers/`                                    | Adapters for privileged Firefox/Gecko globals and services.                               |
 | `patchers/`                                    | Compatibility patches for Firefox/Zen UI implementation.                                  |
+| `patchers/source_patches.mjs`                  | Text patches for Firefox sources; browser-global-free so Node tests can run them.         |
 | `utils/browser_layout.mjs`                     | Browser container resolution (`#zen-tabbox-wrapper` for Zen, `#browser` for Firefox).     |
 | `utils/`, `icons/`                             | Shared helpers and SVG assets.                                                            |
+| `tests/` (repo root)                           | Node unit tests for pure logic (settings, import/export, source patches).                 |
+| `scripts/` (repo root)                         | Development scripts, e.g. `check_patch_targets.mjs` (see "Static checks").                |
 
 ## Implementation conventions
 
@@ -111,20 +114,36 @@ Follow an existing setting through these files under `src/second_sidebar/`:
   Also check the new-panel popup/controller when the setting should be
   available during creation.
 
-Both settings dialogs apply changes live. Their Cancel handlers only close the
-popup; Save persists the current settings. Do not assume Cancel restores the
-previous values when extending these flows.
+Both settings dialogs apply changes live, and Save persists them. Closing
+without saving (Cancel, Escape, clicking outside) asks for confirmation when
+something changed, then rolls each changed field back through the popup's
+`#getChangeReverters()` list (upstream code, from
+aminought/firefox-second-sidebar#210). When adding a setting to either popup,
+add its reverter there too, or discarding changes will leave it applied.
 
-Settings export/import (sidebar settings popup → `sidebar_main_settings.mjs`)
-writes a single JSON file: `{ version, exportedAt, sidebarSettings, webPanels }`
-(state such as `lastUrl` is deliberately excluded - see above). Import writes
-straight to the same storage `SidebarSettings`/`WebPanelsSettings.save()`
-already use rather than hot-applying live, since a wholesale replacement can
-add/remove entire panels and containers at once; a restart picks it up like
-any fresh window. Bump `EXPORT_VERSION` in that file only for a breaking
-shape change (a field renamed/repurposed) - a new optional field doesn't need
-it, since the settings classes' own constructor defaults already backfill it
-for older exports.
+Settings export/import (sidebar settings popup → `sidebar_main_settings.mjs`,
+file format in `settings/settings_export.mjs`) writes a single JSON file:
+`{ version, exportedAt, sidebarSettings, webPanels }` (state such as `lastUrl`
+is deliberately excluded - see above). `parseSettingsExport` validates the
+whole file (web panel uuids/urls, duplicate uuids, newer `version`) before
+anything is written. Import writes straight to the same storage
+`SidebarSettings`/`WebPanelsSettings.save()` already use rather than
+hot-applying live, since a wholesale replacement can add/remove entire panels
+and containers at once; a restart picks it up like any fresh window. Until
+then every open window still holds its pre-import settings and would save
+them back on ordinary actions (opening, moving or resizing a panel), so the
+import first sends `SidebarEvents.SUSPEND_SETTINGS_SAVES`, which makes
+`SidebarController.saveSettings()` and `WebPanelsController.saveSettings()`
+no-ops in every open window until the browser restarts (never lifted, even if
+the write fails: after an earlier import, resuming would let windows save
+their pre-import settings over it), then offers to restart. Windows opened
+after the import load the imported files, so they aren't suspended. Route
+new settings writes through those two methods so they respect the
+suspension. Bump
+`EXPORT_VERSION` only for a breaking shape change (a field
+renamed/repurposed) - a new optional field doesn't need it, since the
+settings classes' own constructor defaults already backfill it for older
+exports.
 
 ## Invariants and sensitive areas
 
@@ -143,14 +162,16 @@ for older exports.
     `DirectoryServiceWrapper.profileChromeDir` (`wrappers/directory_service.mjs`,
     backed by Gecko's "UChrm" directory-service key) instead of resolving a
     loader-registered chrome:// alias - it works under any loader.
-  - `utils/files.mjs`'s `writeFile()` still has to return a URL its three
-    `patchers/*.mjs` callers can `import()` (they write a patched copy of a
-    Firefox internal module, then dynamically import it back in). It tries
-    fx-autoconfig's `chrome://userchrome/content/` alias first (verified via
-    `ChromeRegistry.convertChromeURL`, not just assumed), and falls back to a
-    plain `file://` URL via `DirectoryServiceWrapper.fileURIFromPath()` when
-    that alias isn't registered. Keep that fallback if you touch this file -
-    it's the difference between those three patchers working under Sine or not.
+  - `utils/files.mjs`'s `importPatchedModule()` is how the three source
+    patchers load their patched copy of a Firefox internal module: it writes
+    the copy next to this addon's own files (resolved from
+    `import.meta.url`, so whatever chrome:// origin served the addon),
+    imports it and deletes it. Don't switch it to fx-autoconfig's
+    `chrome://userchrome/content/` alias (not registered under Sine) or a
+    `file://` URL (blocked by the CSP Sine applies to dynamically imported
+    scripts: `script-src chrome: resource: moz-src:`). Each call uses a
+    unique file name, because every window runs the patchers and a shared
+    name let one window delete the file while another was importing it.
 - **`theme.json`** (repo root) is this fork's Sine mod manifest. Its `scripts`
   field deliberately points at `src/second_sidebar.uc.mjs`'s real, nested
   path rather than assuming a flattened repo - see "Why `src/` stays" below.
@@ -254,40 +275,77 @@ for older exports.
 - Use `controllers/events.mjs` for cross-window actions. Preserve event names,
   UUIDs, payload fields, and `isActiveWindow` behavior. Permanent panels are
   shared across windows; temporary creation is limited to the active window.
-- Settings are JSON string preferences: `second-sidebar.settings`,
-  `second-sidebar.web-panels`, and `second-sidebar.web-panels-state`. Preserve
-  saved user data and defaults for missing fields. When adding a setting, update
-  its model, load/save or `fromObject`/`toObject` paths, UI, and event handling
+  Since events go to every window, a window can receive an event for a
+  temporary panel it doesn't have: per-panel listeners must ignore unknown
+  uuids (use `WebPanelsController#listenWebPanelEvent`, which the `#bind*`
+  helpers already do, or check `webPanelsController.get(uuid)` for null).
+- Sidebar settings are a JSON string preference (`second-sidebar.settings`).
+  Web panel settings and state are JSON files in the profile's
+  `chrome/second-sidebar-data/` (`web-panels.json`, `web-panels-state.json`,
+  via `FileSettings` in `settings/settings.mjs`); the older
+  `second-sidebar.web-panels`/`second-sidebar.web-panels-state` prefs are only
+  read once, to migrate. If saved data can't be read, a copy is kept
+  (`*.corrupt-<timestamp>.json`, or a `<pref>.corrupt` pref) before defaults
+  are used, since the next save overwrites the original. Preserve saved user
+  data and defaults for missing fields. When adding a setting, update its
+  model, load/save or `fromObject`/`toObject` paths, UI, and event handling
   together. Keep panel settings distinct from state such as `lastUrl`.
+  Web panel saves are debounced and flushed when the window unloads.
 - Preserve container identity and the existing loading/security context when
   creating or navigating panel tabs. Account for temporary panels, unload on
   close, reload timers, listeners, and observers when changing panel lifecycle.
 - Browser internals are version-sensitive. For patcher changes, inspect the
   actual target browser source and verify the text/regex replacement still matches.
-  Preserve temporary-module cleanup in `utils/files.mjs`. Keep these patches
-  isolated rather than spreading source rewriting through controllers.
+  Define text patches in `patchers/source_patches.mjs` with a `description`:
+  `applySourcePatches` reports any that no longer match, and the patchers
+  pass those to `reportUnappliedPatches`, which logs a `console.warn` with
+  the browser version (so breakage after an update is diagnosable rather than
+  silent). Keep that module free of browser globals at import time: the unit
+  tests and `scripts/check_patch_targets.mjs` run it in Node. Add runtime
+  targets (methods or properties a patcher replaces, like
+  `UrlbarInputPatcher`'s) to that script's `requires` list. Preserve
+  temporary-module cleanup in `utils/files.mjs`. Keep these patches isolated
+  rather than spreading source rewriting through controllers.
+- `UrlbarInputPatcher#patchValueFormatterUpdate` only applies to Firefox
+  versions with a public `gURLBar.valueFormatter`. Current Firefox (where
+  `gURLBar` is a `<moz-urlbar>` element) keeps the formatter private and
+  makes `update()` async, so it can no longer throw inside `removeTab()`; the
+  patch detects that and skips itself, and any rejected promise is filtered
+  by `#suppressValueFormatterErrors`. Its retry loop is capped (30 s) so it
+  can't poll forever.
 
 ## Static checks
 
-There is no tracked package manifest, lockfile, npm script, or automated test
-suite. `.gitignore` excludes `package.json`, `package-lock.json`, and
+There is no tracked package manifest, lockfile, or npm script.
+`.gitignore` excludes `package.json`, `package-lock.json`, and
 `node_modules`; these may exist locally but are not the project contract.
-The tracked check definitions are `eslint.config.mjs`, `.prettierrc`, and
-`.github/workflows/`.
+The tracked check definitions are `eslint.config.mjs`, `.prettierrc`,
+`tests/`, `scripts/`, and `.github/workflows/`. Unit tests cover pure logic
+only (settings round-trips, import/export validation, source patches) and use
+Node's built-in test runner, so they need no install.
 
 For a checkout without local tooling, install the lint/format tools from the
 repository root (this is development setup, not a runtime dependency):
 
 ```sh
-npm install --no-save --package-lock=false eslint@9.7.0 @eslint/js@9 globals@15 prettier@3
+npm install --no-save --package-lock=false eslint@9.7.0 @eslint/js@9.7.0 globals@15 prettier@3.9.9
 ```
 
 Run the checks relevant to changed files:
 
 ```sh
 npx eslint .
-npx prettier --check "src/**/*.mjs" "*.mjs" "*.md" "*.json" ".github/workflows/*.yml"
+npx prettier --check "src/**/*.mjs" "tests/*.mjs" "scripts/*.mjs" "*.mjs" "*.md" "*.json" ".github/**/*.yml"
+node --test "tests/*.test.mjs"
 git diff --check
+```
+
+When changing a patcher or `patchers/source_patches.mjs`, also run the
+patches against current Firefox sources (needs network access; branches of
+`mozilla-firefox/firefox`):
+
+```sh
+node scripts/check_patch_targets.mjs release beta main
 ```
 
 For documentation-only edits, check formatting on the edited Markdown files.
@@ -299,13 +357,12 @@ CI installs ESLint 9.7.0 and uploads SARIF using
 `@microsoft/eslint-formatter-sarif@3.1.0`. The lint step no longer uses
 `continue-on-error` (removed once the repo reached a clean baseline) - a
 lint error now fails the workflow, so don't reintroduce that flag as a way
-to land something that doesn't pass. The Prettier workflow uses a dry run
-via `creyD/prettier_action@v4.3`, which may pin a different Prettier minor
-version than what `npm install prettier@3` gives you locally; a newer local
-Prettier can flag large swaths of untouched, previously-clean files that
-CI's pinned version wouldn't. Treat a `prettier --check` failure spanning
-files you didn't touch as this version drift, not a real regression - per
-above, only reformat files this change actually edited. Add legitimate
+to land something that doesn't pass. The SARIF report is generated and
+uploaded even when the lint step fails. The Prettier workflow uses a dry run
+via `creyD/prettier_action`, pinned (`prettier_version`) to the same
+Prettier version as the local setup command above; keep the two in sync
+when upgrading, or a newer local Prettier can flag untouched files CI
+wouldn't. Add legitimate
 Firefox/Zen globals to the existing ESLint globals list when needed, rather
 than broadly disabling rules; note that VS Code's built-in JS language
 service checks JSDoc `@param`/global references independently of ESLint's
@@ -317,8 +374,29 @@ validate privileged browser APIs or XUL UI.
 A **Sync upstream** workflow (`.github/workflows/sync-upstream.yml`) runs every
 Monday at 09:00 UTC and opens a Pull Request whenever `aminought/firefox-second-sidebar`
 has new commits. It can also be triggered manually via **Actions → Sync upstream →
-Run workflow**. A `SYNC_PAT` repository secret is required for full PR functionality;
-see the workflow file header for setup instructions.
+Run workflow**. Every step after "Decide whether to sync" is gated on its
+`proceed` output - an `exit 0` only ends one step, not the job, so don't use
+one to skip the rest. It skips the run while a sync PR is still open, and
+deletes the branch it pushed if the PR can't be opened. Opening the PR needs
+a `SYNC_PAT` repository secret (preferred) or "Allow GitHub Actions to create
+and approve pull requests"; see the workflow file header.
+
+Other workflows: **Tests** (`node --test` on pushes and PRs), **Patch
+targets** (weekly, and on PRs touching patchers: runs
+`scripts/check_patch_targets.mjs` against Firefox release, beta and main) and
+**Release** (see below).
+
+### Releases
+
+1. Bump `version` in `theme.json`.
+2. Move the `[Unreleased]` notes in `CHANGELOG.md` into a new
+   `## [<version>] - <date>` section.
+3. Push a matching tag: `git tag v<version> && git push origin v<version>`.
+
+The **Release** workflow checks the tag against `theme.json`, and publishes a
+GitHub release with that version's changelog section and a zip of `src/` for
+fx-autoconfig users. Add user-visible changes to `[Unreleased]` as you make
+them.
 
 ## Firefox and Zen Browser validation
 
@@ -428,6 +506,13 @@ upstream improvements automatically. If upstream ever changes how
 re-apply the loader-portability treatment on top of upstream's version
 rather than taking upstream's as-is.
 
+The patchers diverge from upstream too: their text patches live in
+`patchers/source_patches.mjs` and their module loading in
+`importPatchedModule()`. When upstream changes a replacement in one of its
+`patchers/*_patcher.mjs` files, port the change into `source_patches.mjs`
+(and `tests/source_patches.test.mjs`) instead of restoring upstream's inline
+version.
+
 ### Zen compatibility checklist
 
 Before committing any change to source files, verify:
@@ -441,7 +526,7 @@ Before committing any change to source files, verify:
 - [ ] New `--sb2-*` CSS variables have Zen-aware fallbacks using `--sb2-zen-*` tokens.
 - [ ] Both `[zen-right-side="true"]` sidebar positions work correctly.
 - [ ] `WebPanelsBrowser.forceRepaint()` is called after tab switches on Windows.
-- [ ] `npx prettier --write` and `npx eslint` both pass on changed files.
+- [ ] `npx prettier --write`, `npx eslint` and `node --test "tests/*.test.mjs"` pass.
 
 ## Upstream references
 

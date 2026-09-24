@@ -12,6 +12,8 @@
 
 A Zen userChrome.js script that brings a second sidebar with web panels like in Vivaldi/Edge/Floorp but better.
 
+For a tour of the features and settings shared with upstream (web panels, containers, floating and pinned panels, shortcuts, auto-hide, and more), see the [upstream README](https://github.com/aminought/firefox-second-sidebar#readme). Changes in this fork are listed in the [changelog](CHANGELOG.md).
+
 <img width="2200" height="2131" alt="promo-rounded" src="https://github.com/user-attachments/assets/020ee8cf-1f3d-4184-98fe-889be89d6145" />
 
 ## Installation
@@ -33,14 +35,26 @@ Pick whichever loader you already use (or prefer) — both install the exact sam
 ### fx-autoconfig (manual)
 
 1. Install [fx-autoconfig](https://github.com/MrOtherGuy/fx-autoconfig).
-2. Copy the contents of the `src/` directory (`second_sidebar/` and `second_sidebar.uc.mjs`) into `chrome/JS/`.
+2. Copy the contents of the `src/` directory (`second_sidebar/` and `second_sidebar.uc.mjs`) into `chrome/JS/`. Each [release](https://github.com/sinazadeh/zen-second-sidebar-enhanced/releases) also has them as a zip.
 3. Enable `toolkit.legacyUserProfileCustomizations.stylesheets` and `dom.allow_scripts_to_close_windows` in `about:config`.
 4. [Clear](https://github.com/MrOtherGuy/fx-autoconfig?tab=readme-ov-file#deleting-startup-cache) startup-cache.
 5. Have fun!
 
 ## Backup
 
-Use **Export settings** / **Import settings** (sidebar settings popup) to save or restore the sidebar and every web panel's settings as one JSON file. This covers configuration only, not per-panel state like the last-opened URL. Importing writes the file's settings to disk immediately; restart the browser afterward for the change to fully take effect.
+Use **Export settings** / **Import settings** (sidebar settings popup) to save or restore the sidebar and every web panel's settings as one JSON file. This covers configuration only, not per-panel state like the last-opened URL. Importing checks the file, writes its settings to disk and offers to restart the browser, which is when they take effect. Until the restart, other changes to the sidebar or web panels aren't saved, so they can't overwrite the import.
+
+### Where your data is stored
+
+- Sidebar settings: the `second-sidebar.settings` preference (`about:config`).
+- Web panels and their state (e.g. last URL): `web-panels.json` and `web-panels-state.json` in the `chrome/second-sidebar-data/` folder of your profile (`about:support` → _Profile Folder_). This folder is outside the script itself, so updating or reinstalling the script keeps it.
+
+If one of these can't be read (for example after a crash while saving), the sidebar starts with defaults and keeps a copy of the unreadable data next to it, named `*.corrupt-<date>.json` (or a `second-sidebar.settings.corrupt` preference).
+
+## Uninstall
+
+1. Remove the mod in Sine, or delete `second_sidebar.uc.mjs` and `second_sidebar/` from `chrome/JS/` (fx-autoconfig), then restart the browser.
+2. Optionally delete your data too: the `chrome/second-sidebar-data/` folder in your profile, and any `second-sidebar.*` preferences in `about:config`.
 
 ## Demo
 
@@ -49,3 +63,8 @@ https://github.com/user-attachments/assets/cd79d644-ca2c-4a30-ae8e-c265f41768b6
 ## Troubleshooting
 
 The Browser Console (`Ctrl+Shift+J` / `Cmd+Shift+J`) logs the sidebar's startup sequence and any errors by default. For more detail when reporting a bug (web panel lifecycle, per-setting change events, etc.), set `second-sidebar.debug-logging` to `true` in `about:config` and reproduce the issue again.
+
+- **Installed with Sine, but the sidebar never appears and the console shows nothing about it:** check that `sine.allow-unsafe-js` is `true` in `about:config` (see [Installation](#sine)). Without it, Sine silently never loads scripts from mods added by repository.
+- **It stopped working after installing Sine on another profile:** Sine and fx-autoconfig each replace a single bootstrap file shared by every profile of the same browser installation, so setting up one of them can turn off the other for all profiles. Use the same loader on every profile of that installation (for example, install Second Sidebar through Sine here too).
+- **A warning says a patch "no longer applies":** a browser update changed Firefox code this script adjusts, and the related feature may misbehave. Please [open an issue](https://github.com/sinazadeh/zen-second-sidebar-enhanced/issues/new?template=bug_report.yml) with the warning and your browser version.
+- **Settings popups are cut off:** they should be limited to the window height and scroll; if the Save button is still out of reach, please report it with your OS and window manager.
