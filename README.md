@@ -40,13 +40,17 @@ Pick whichever loader you already use (or prefer) — both install the exact sam
 4. [Clear](https://github.com/MrOtherGuy/fx-autoconfig?tab=readme-ov-file#deleting-startup-cache) startup-cache.
 5. Have fun!
 
+## Settings
+
+Right-click the sidebar and choose **Sidebar settings**. With Sine, the same settings are also on Sine's mod page: click the gear button of **Zen Second Sidebar Enhanced**. Changes there apply right away, like in the popup. Keyboard shortcuts and settings export/import are only in the popup.
+
 ## Backup
 
 Use **Export settings** / **Import settings** (sidebar settings popup) to save or restore the sidebar and every web panel's settings as one JSON file. This covers configuration only, not per-panel state like the last-opened URL. Importing checks the file, writes its settings to disk and offers to restart the browser, which is when they take effect. Until the restart, other changes to the sidebar or web panels aren't saved, so they can't overwrite the import.
 
 ### Where your data is stored
 
-- Sidebar settings: the `second-sidebar.settings` preference (`about:config`).
+- Sidebar settings: the `second-sidebar.settings` preference (`about:config`). Each of them except keyboard shortcuts is also copied to its own preference, such as `second-sidebar.position`, which is what Sine's settings page changes (changing one in `about:config` works too).
 - Web panels and their state (e.g. last URL): `web-panels.json` and `web-panels-state.json` in the `chrome/second-sidebar-data/` folder of your profile (`about:support` → _Profile Folder_). This folder is outside the script itself, so updating or reinstalling the script keeps it.
 
 If one of these can't be read (for example after a crash while saving), the sidebar starts with defaults and keeps a copy of the unreadable data next to it, named `*.corrupt-<date>.json` (or a `second-sidebar.settings.corrupt` preference).

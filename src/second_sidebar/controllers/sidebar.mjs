@@ -482,6 +482,8 @@ export class SidebarController {
       Logger.debug("Sidebar settings save skipped: import pending restart");
       return;
     }
-    this.dumpSettings().save();
+    const settings = this.dumpSettings();
+    settings.save();
+    SidebarControllers.sidebarPrefsController.writePrefs(settings);
   }
 }

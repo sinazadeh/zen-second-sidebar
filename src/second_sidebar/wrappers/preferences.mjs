@@ -51,4 +51,24 @@ export class PreferencesWrapper {
   static setBoolPref(pref, value) {
     return Services.prefs.setBoolPref(pref, value);
   }
+
+  /**
+   * Notifies `observer.observe(subject, topic, prefName)` whenever a pref
+   * whose name starts with `domain` changes.
+   *
+   * @param {string} domain
+   * @param {{observe: function(*, string, string):void}} observer
+   */
+  static addObserver(domain, observer) {
+    Services.prefs.addObserver(domain, observer);
+  }
+
+  /**
+   *
+   * @param {string} domain
+   * @param {{observe: function(*, string, string):void}} observer
+   */
+  static removeObserver(domain, observer) {
+    Services.prefs.removeObserver(domain, observer);
+  }
 }
