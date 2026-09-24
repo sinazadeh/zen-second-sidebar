@@ -88,6 +88,6 @@ export class WebPanelPopupDelete extends Panel {
     };
     this.addEventListener("popuphidden", this.restoreWebPanelButtonState);
 
-    Panel.prototype.openPopup.call(this, webPanelController.button);
+    Panel.prototype.openPopupWithinWindow.call(this, webPanelController.button);
   }
 }

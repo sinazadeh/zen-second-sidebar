@@ -619,7 +619,7 @@ export class SidebarMainPopupSettings extends Panel {
     this.addEventListener("popuphidden", this.closeOnPopupHidden);
     window.addEventListener("keydown", this.escapeOnKeyDown, true);
 
-    Panel.prototype.openPopupAtScreen.call(this, screenX, screenY);
+    Panel.prototype.openPopupAtScreenWithinWindow.call(this, screenX, screenY);
   }
 
   #requestClose() {
