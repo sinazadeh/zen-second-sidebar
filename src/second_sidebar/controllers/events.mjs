@@ -101,6 +101,27 @@ export const sendEvents = (type, detail = {}) => {
 };
 
 /**
+ * Dispatches an event to this window only, for a change every window picks
+ * up on its own (e.g. through its own pref observer), where sendEvents
+ * would apply it once per window in every window.
+ *
+ * @param {string} type
+ * @param {object} detail
+ */
+export const sendLocalEvent = (type, detail = {}) => {
+  const window = new WindowWrapper();
+  const lastWindow = WindowManagerWrapper.getMostRecentBrowserWindow();
+  window.dispatchEvent(
+    new CustomEvent(type, {
+      detail: {
+        ...detail,
+        isActiveWindow: WindowWrapper.isEqual(window, lastWindow),
+      },
+    }),
+  );
+};
+
+/**
  *
  * @param {string} type
  * @param {function(Event):void} callback

@@ -105,7 +105,12 @@ Follow an existing setting through these files under `src/second_sidebar/`:
 
 - Sidebar: `xul/sidebar_main_popup_settings.mjs` →
   `controllers/sidebar_main_settings.mjs` → `controllers/events.mjs` → the
-  receiving controller → `settings/sidebar_settings.mjs`.
+  receiving controller → `settings/sidebar_settings.mjs`. Also give it a pref
+  in `settings/sidebar_prefs.mjs` and a control in the root `preferences.json`
+  (Sine's mod settings dialog), and add its event to `FIELD_EVENTS` in
+  `controllers/sidebar_prefs.mjs`; `tests/sidebar_prefs.test.mjs` fails until
+  the first two match `SidebarSettings`. Only settings that need the popup's
+  own input handling (keyboard shortcuts) are left out.
 - Panel editing: `xul/web_panel_popup_edit.mjs` →
   `controllers/web_panel_edit.mjs` → `controllers/events.mjs` →
   `controllers/web_panels.mjs` (bind it with `#bindSimpleSetting` /
@@ -181,6 +186,11 @@ exports.
   fx-autoconfig already restricts `.uc.mjs` loading to); dropping it would
   make Sine dynamically import this script into every chrome window,
   including ones lacking `gBrowser`/the sidebar's expected DOM.
+  Its `preferences` field names the root `preferences.json`, which Sine
+  turns into the mod's settings (gear) dialog; each control there edits one
+  of the mirrored sidebar prefs (see "Sidebar settings are a JSON string
+  preference" below). Sine only picks the file up when it installs or
+  updates the mod, i.e. after a `version` bump.
 - **Sine's `sine.allow-unsafe-js` gate**: this is not something this repo
   controls, but it's the single most likely reason "installed via Sine but
   the sidebar never appears" gets reported.
@@ -292,6 +302,12 @@ exports.
   uuids (use `WebPanelsController#listenWebPanelEvent`, which the `#bind*`
   helpers already do, or check `webPanelsController.get(uuid)` for null).
 - Sidebar settings are a JSON string preference (`second-sidebar.settings`).
+  Each one except the keyboard shortcuts is mirrored to its own
+  `second-sidebar.*` pref for Sine's settings dialog: `SidebarPrefsController`
+  writes them from the JSON at startup and on every save, and applies and
+  saves a valid change made to one (invalid values are written back). The
+  JSON stays the source of truth, so importing settings doesn't touch the
+  mirrored prefs until the restart rewrites them.
   Web panel settings and state are JSON files in the profile's
   `chrome/second-sidebar-data/` (`web-panels.json`, `web-panels-state.json`,
   via `FileSettings` in `settings/settings.mjs`); the older
