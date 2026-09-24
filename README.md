@@ -25,9 +25,9 @@ Pick whichever loader you already use (or prefer) — both install the exact sam
 1. Install [Sine](https://github.com/CosmoCreeper/Sine) if you haven't already.
 2. In Sine's mod manager, add a mod from a repository and enter:
    ```
-   sinazadeh/zen-second-sidebar-enhanced/tree/master
+   sinazadeh/zen-second-sidebar-enhanced
    ```
-   The explicit `/tree/master` is required — this repo's default branch is `master`, and Sine assumes `main` when it's left off.
+   Installed it earlier as `sinazadeh/zen-second-sidebar-enhanced/tree/master`? That keeps working (the default branch was renamed from `master` to `main`, and GitHub redirects the old name), but you can remove the mod and add it again with the address above to be safe; your settings are kept.
 3. In `about:config`, set `sine.allow-unsafe-js` to `true`. This isn't specific to Second Sidebar: Sine only runs JavaScript automatically for mods installed from its own reviewed marketplace; anything added directly from a repository (like this, until/unless it's published there) needs this explicitly enabled, or its script is silently never loaded at all.
 4. Enable `toolkit.legacyUserProfileCustomizations.stylesheets` and `dom.allow_scripts_to_close_windows` in `about:config` if not already enabled.
 5. Restart the browser.
