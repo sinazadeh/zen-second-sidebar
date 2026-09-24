@@ -1,4 +1,5 @@
 import { FaviconsWrapper } from "../wrappers/favicons.mjs";
+import { Logger } from "./logger.mjs";
 import { NetUtilWrapper } from "../wrappers/net_utils.mjs";
 
 const PREDEFINED_ICONS = {
@@ -25,43 +26,84 @@ const PREDEFINED_ICONS = {
 
 export const FALLBACK_ICON = "chrome://global/skin/icons/defaultFavicon.svg";
 
+const ICON_LOAD_TIMEOUT = 5000;
+
 /**
+ * @param {string} url
+ * @returns {Promise<boolean>} Whether the URL loads as an image in this
+ *   window. An icon that doesn't (unreachable host, a domain tracking
+ *   protection blocks, an error page) would leave its button blank.
+ */
+function loadsAsImage(url) {
+  return new Promise((resolve) => {
+    const image = new Image();
+    const done = (loaded) => {
+      clearTimeout(timer);
+      image.onload = image.onerror = null;
+      resolve(loaded);
+    };
+    const timer = setTimeout(() => done(false), ICON_LOAD_TIMEOUT);
+    image.onload = () => done(true);
+    image.onerror = () => done(false);
+    image.src = url;
+  });
+}
+
+/**
+ * @param {Array<string?>} urls Icon URLs, best first; empty ones are skipped.
+ * @returns {Promise<string>} The first that loads, or FALLBACK_ICON.
+ */
+export async function firstLoadableIcon(urls) {
+  for (const url of urls) {
+    if (url && (await loadsAsImage(url))) {
+      return url;
+    }
+  }
+  return FALLBACK_ICON;
+}
+
+/**
+ * Finds an icon for a page, trying in order: the copy of its favicon stored
+ * in Places (read locally, so it shows even when the icon's own server
+ * can't be reached from here), that favicon's own URL, Google's favicon
+ * service, and finally FALLBACK_ICON, using the first that actually loads.
  *
  * @param {string} url
+ * @param {object} params
+ * @param {boolean} params.local Allow the local `cached-favicon:` copy. Off
+ *   when the result is saved in settings, which can be exported to another
+ *   profile whose Places doesn't have the icon.
  * @returns {Promise<string>}
  */
-export function fetchIconURL(url) {
-  return new Promise((resolve) => {
-    const uri = NetUtilWrapper.newURI(url);
-    if (uri.specIgnoringRef in PREDEFINED_ICONS) {
-      resolve(PREDEFINED_ICONS[uri.specIgnoringRef]);
-    }
+export async function fetchIconURL(url, { local = true } = {}) {
+  let uri;
+  try {
+    uri = NetUtilWrapper.newURI(url);
+  } catch {
+    return FALLBACK_ICON;
+  }
+  if (uri.specIgnoringRef in PREDEFINED_ICONS) {
+    return PREDEFINED_ICONS[uri.specIgnoringRef];
+  }
 
-    FaviconsWrapper.setDefaultIconURIPreferredSize(32);
-    FaviconsWrapper.getFaviconURLForPage(uri, async (faviconURI) => {
-      let provider = "browser";
-      let faviconURL = faviconURI?.spec;
-      try {
-        if (!faviconURL) {
-          provider = "google";
-          faviconURL = `https://www.google.com/s2/favicons?domain=${uri.host}&sz=32`;
-          const response = await fetch(faviconURL);
-          if (response.status !== 200) {
-            throw Error(`Got ${response.status} from ${provider}`);
-          }
-        }
-      } catch (error) {
-        console.log(
-          `Failed to fetch icon ${faviconURL} from provider ${provider}:`,
-          error,
-        );
-        provider = "fallback";
-        faviconURL = FALLBACK_ICON;
-      }
-      console.log(`Got favicon for ${url} from ${provider}`);
-      resolve(faviconURL);
-    });
-  });
+  FaviconsWrapper.setDefaultIconURIPreferredSize(32);
+  const faviconURL = await FaviconsWrapper.getFaviconURLForPage(uri).catch(
+    () => null,
+  );
+  let host = "";
+  try {
+    host = uri.host;
+  } catch {
+    // about:, data: and other URLs without a host.
+  }
+
+  const iconURL = await firstLoadableIcon([
+    local && faviconURL ? `cached-favicon:${faviconURL}` : null,
+    faviconURL,
+    host ? `https://www.google.com/s2/favicons?domain=${host}&sz=32` : null,
+  ]);
+  Logger.debug(`Icon for ${url}:`, iconURL);
+  return iconURL;
 }
 
 /**

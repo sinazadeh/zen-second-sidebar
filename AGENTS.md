@@ -292,6 +292,15 @@ exports.
   room and cap its height to that room (`--sb2-popup-max-height` in
   `css/popups.mjs`). The `second-sidebar.fit-popups-to-window` pref forces
   this on (`true`) or off (`false`) on any platform.
+- Web panel icons: `fetchIconURL` (`utils/icons.mjs`) returns the first
+  candidate that actually loads as an image in the window
+  (`firstLoadableIcon`): Places' stored copy (`cached-favicon:`, only when
+  Places returned a favicon, since that protocol serves the default icon for
+  unknown ones), the favicon's own URL, Google's favicon service, then
+  `FALLBACK_ICON`. Custom icons go through
+  `WebPanelButton#setIconWithFallback`. Don't put an unverified network icon
+  URL on a button: if it fails to load (a tracker-blocked CDN, an
+  unreachable host), the button stays blank.
 - Reuse widget readiness helpers such as `doWhenButtonReady`; CustomizableUI
   instances are not always available synchronously in every window.
 - Use `controllers/events.mjs` for cross-window actions. Preserve event names,

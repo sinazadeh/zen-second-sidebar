@@ -16,17 +16,21 @@ export class FaviconsWrapper {
   }
 
   /**
+   * The URL of the favicon Places has stored for a page, if any.
    *
    * @param {URI} uri
-   * @param {function(URI):void} callback
+   * @returns {Promise<string?>}
    */
-  static getFaviconURLForPage(uri, callback) {
+  static getFaviconURLForPage(uri) {
     if ("getFaviconURLForPage" in Favicons) {
-      Favicons.getFaviconURLForPage(uri, callback);
-    } else {
-      Favicons.getFaviconForPage(uri).then((favicon) =>
-        callback(favicon ? favicon.uri : null),
+      return new Promise((resolve) =>
+        Favicons.getFaviconURLForPage(uri, (faviconURI) =>
+          resolve(faviconURI?.spec ?? null),
+        ),
       );
     }
+    return Favicons.getFaviconForPage(uri).then(
+      (favicon) => favicon?.uri?.spec ?? null,
+    );
   }
 }

@@ -6,6 +6,17 @@ below (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
 
+## [1.2.5] - 2026-09-24
+
+### Fixed
+
+- Web panel buttons no longer stay blank when a site's icon can't be loaded
+  from its own server (seen with Instagram and GitHub until the panel was
+  opened once). The icon stored in the browser's history is tried first,
+  then the site's icon URL, Google's favicon service and finally a default
+  icon, using the first that actually loads. A custom icon URL that doesn't
+  load falls back to the site's own icon.
+
 ## [1.2.4] - 2026-09-24
 
 ### Added

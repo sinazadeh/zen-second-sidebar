@@ -1,4 +1,8 @@
-import { FALLBACK_ICON, fetchIconURL } from "../utils/icons.mjs";
+import {
+  FALLBACK_ICON,
+  fetchIconURL,
+  firstLoadableIcon,
+} from "../utils/icons.mjs";
 
 import { NotificationBadge } from "./notification_badge.mjs";
 import { WebPanelSettings } from "../settings/web_panel_settings.mjs"; // eslint-disable-line no-unused-vars
@@ -12,6 +16,10 @@ const URL_LABEL_LIMIT = 24;
 const URL_TOOLTIP_LIMIT = 64;
 
 export class WebPanelButton extends Widget {
+  // Bumped by every setIcon(), so an icon lookup that resolves after a
+  // newer icon was set doesn't overwrite it.
+  #iconRequest = 0;
+
   /**
    *
    * @param {WebPanelSettings} webPanelSettings
@@ -47,12 +55,53 @@ export class WebPanelButton extends Widget {
       if (webPanelSettings.faviconURL) {
         this.setIcon(webPanelSettings.faviconURL);
       }
+      const request = this.#iconRequest;
       fetchIconURL(webPanelSettings.url).then((faviconURL) => {
-        this.setIcon(faviconURL);
+        if (request === this.#iconRequest) {
+          this.setIcon(faviconURL);
+        }
       });
     } else {
-      this.setIcon(webPanelSettings.faviconURL ?? FALLBACK_ICON);
+      this.setIconWithFallback(
+        webPanelSettings.faviconURL,
+        webPanelSettings.url,
+      );
     }
+  }
+
+  /**
+   *
+   * @param {string} iconURL
+   * @returns {WebPanelButton}
+   */
+  setIcon(iconURL) {
+    this.#iconRequest++;
+    return super.setIcon(iconURL);
+  }
+
+  /**
+   * Shows `iconURL` (a custom icon), replacing it with the page's own icon
+   * (see fetchIconURL) if it doesn't load, e.g. because its server can't be
+   * reached, instead of leaving the button blank.
+   *
+   * @param {string} iconURL
+   * @param {string} pageURL
+   * @returns {WebPanelButton}
+   */
+  setIconWithFallback(iconURL, pageURL) {
+    this.setIcon(iconURL || FALLBACK_ICON);
+    const request = this.#iconRequest;
+    firstLoadableIcon([iconURL]).then((loadedURL) => {
+      if (loadedURL !== FALLBACK_ICON || request !== this.#iconRequest) {
+        return;
+      }
+      fetchIconURL(pageURL).then((pageIconURL) => {
+        if (request === this.#iconRequest) {
+          this.setIcon(pageIconURL);
+        }
+      });
+    });
+    return this;
   }
 
   /**
