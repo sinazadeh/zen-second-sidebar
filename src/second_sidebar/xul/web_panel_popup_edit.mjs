@@ -182,7 +182,11 @@ export class WebPanelPopupEdit extends Panel {
         this.faviconRequestPending = true;
         this.saveButton.setAttribute("disabled", true);
         try {
-          const faviconURL = await fetchIconURL(this.urlInput.getValue());
+          // Saved in settings (and exports), so no profile-local
+          // cached-favicon: URL.
+          const faviconURL = await fetchIconURL(this.urlInput.getValue(), {
+            local: false,
+          });
           if (requestId !== this.faviconRequestId) {
             return;
           }

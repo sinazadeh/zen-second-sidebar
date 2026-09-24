@@ -305,16 +305,16 @@ export class WebPanelController {
   }
 
   updateFavicon() {
-    let image = this.#settings.dynamicFavicon
-      ? this.#tab.image
-      : this.#settings.faviconURL;
-    if (!image || image.length === 0) image = FALLBACK_ICON;
     const busy = this.#tab.getAttributeBool("busy");
     const progress = this.#tab.getAttributeBool("progress");
     if (busy || progress) {
       this.#button.setLoading(true).setIcon("");
+    } else if (this.#settings.dynamicFavicon) {
+      this.#button.setLoading(false).setIcon(this.#tab.image || FALLBACK_ICON);
     } else {
-      this.#button.setLoading(false).setIcon(image);
+      this.#button
+        .setLoading(false)
+        .setIconWithFallback(this.#settings.faviconURL, this.#settings.url);
     }
   }
 
