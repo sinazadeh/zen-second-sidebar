@@ -28,20 +28,32 @@ jobs:
       actions: read # only required for a private repository by github/codeql-action/upload-sarif to get the Action run status
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
+      # eslint.config.mjs imports @eslint/js and globals directly, so install
+      # them explicitly (same versions as the local setup in AGENTS.md) rather
+      # than relying on them being hoisted from ESLint's own dependencies.
       - name: Install ESLint
         run: |
-          npm install eslint@9.7.0
-          npm install @microsoft/eslint-formatter-sarif@3.1.0
+          npm install --no-save --package-lock=false \
+            eslint@9.7.0 @eslint/js@9.7.0 globals@15 \
+            @microsoft/eslint-formatter-sarif@3.1.0
 
+      # Human-readable output; this step decides whether the job passes.
       - name: Run ESLint
+        run: npx eslint .
+
+      # Code scanning report. Runs (and uploads) even when the step above
+      # failed, so findings show up in the Security tab either way.
+      - name: Generate SARIF report
+        if: always()
         env:
           SARIF_ESLINT_IGNORE_SUPPRESSED: "true"
-        run: npx eslint . --format @microsoft/eslint-formatter-sarif --output-file eslint-results.sarif
+        run: npx eslint . --format @microsoft/eslint-formatter-sarif --output-file eslint-results.sarif || true
 
       - name: Upload analysis results to GitHub
-        uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles('eslint-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: eslint-results.sarif
           wait-for-processing: true

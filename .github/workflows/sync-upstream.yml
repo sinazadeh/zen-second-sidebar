@@ -3,11 +3,15 @@
 # any it opens a Pull Request so the Zen-specific fixes can be reviewed and
 # merged on top of the new upstream work.
 #
-# Required repository secret (Settings -> Secrets -> Actions):
-#   SYNC_PAT - a fine-grained Personal Access Token with
-#              "Contents: Read & Write" and "Pull requests: Read & Write"
-#              scopes on this repository. The default GITHUB_TOKEN cannot
-#              open PRs that trigger other workflows.
+# Opening the PR needs one of these (otherwise the run fails with a clear
+# error and deletes the branch it pushed):
+#   - SYNC_PAT repository secret (Settings -> Secrets -> Actions): a
+#     fine-grained Personal Access Token with "Contents: Read & Write" and
+#     "Pull requests: Read & Write" on this repository. Preferred: PRs
+#     opened with the default GITHUB_TOKEN don't trigger the ESLint/Prettier
+#     workflows.
+#   - Or "Allow GitHub Actions to create and approve pull requests" enabled
+#     in Settings -> Actions -> General, so the GITHUB_TOKEN fallback works.
 
 name: Sync upstream
 
@@ -38,7 +42,7 @@ jobs:
 
     steps:
       - name: Checkout fork
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # Use a PAT so the pushed branch can trigger PR workflows.
           token: ${{ secrets.SYNC_PAT || secrets.GITHUB_TOKEN }}
@@ -46,109 +50,167 @@ jobs:
 
       - name: Add upstream remote
         run: |
-          git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git
-          git fetch upstream ${{ env.UPSTREAM_BRANCH }}
+          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
+          git fetch upstream "${UPSTREAM_BRANCH}"
 
-      - name: Check for new upstream commits
-        id: diff
+      # Every later step is gated on this step's `proceed` output. (An
+      # `exit 0` only ends the step it's in, not the job, which is how an
+      # earlier version of this workflow pushed a branch and tried to open a
+      # "0 new commits" PR when there was nothing to sync.)
+      - name: Decide whether to sync
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run || false }}
         run: |
-          COUNT=$(git rev-list --count HEAD..upstream/${{ env.UPSTREAM_BRANCH }})
+          COUNT=$(git rev-list --count "HEAD..upstream/${UPSTREAM_BRANCH}")
           echo "new_commits=$COUNT" >> "$GITHUB_OUTPUT"
-          if [ "$COUNT" -gt 0 ]; then
-            echo "### New upstream commits ($COUNT)" >> "$GITHUB_STEP_SUMMARY"
-            git log --oneline HEAD..upstream/${{ env.UPSTREAM_BRANCH }} >> "$GITHUB_STEP_SUMMARY"
-          else
+          if [ "$COUNT" -eq 0 ]; then
             echo "Fork is up to date with upstream." >> "$GITHUB_STEP_SUMMARY"
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
-      - name: Exit if no new commits
-        if: steps.diff.outputs.new_commits == '0'
-        run: echo "Nothing to do." && exit 0
+          {
+            echo "### New upstream commits ($COUNT)"
+            git log --oneline "HEAD..upstream/${UPSTREAM_BRANCH}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Exit if dry run
-        if: inputs.dry_run == true && steps.diff.outputs.new_commits != '0'
-        run: |
-          echo "Dry-run: ${{ steps.diff.outputs.new_commits }} new upstream commit(s) found. No PR opened." >> "$GITHUB_STEP_SUMMARY"
-          exit 0
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "Dry run: no branch pushed and no PR opened." >> "$GITHUB_STEP_SUMMARY"
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          OPEN_SYNC_PRS=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open \
+            --base "$BASE_BRANCH" --json headRefName \
+            --jq '[.[] | select(.headRefName | startswith("sync/upstream-"))] | length')
+          if [ "$OPEN_SYNC_PRS" -gt 0 ]; then
+            echo "An upstream sync PR is already open. Merge or close it first; the next run picks up anything newer." >> "$GITHUB_STEP_SUMMARY"
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "proceed=true" >> "$GITHUB_OUTPUT"
 
       - name: Configure git
+        if: steps.plan.outputs.proceed == 'true'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Create sync branch and merge upstream
         id: merge
+        if: steps.plan.outputs.proceed == 'true'
         run: |
-          git checkout -b ${{ env.SYNC_BRANCH }}
-          # Attempt a no-edit merge; conflicts are expected in Zen-specific files.
-          git merge --no-edit upstream/${{ env.UPSTREAM_BRANCH }} || true
-          HAS_CONFLICTS=$(git diff --name-only --diff-filter=U | wc -l | tr -d ' ')
-          echo "conflicts=$HAS_CONFLICTS" >> "$GITHUB_OUTPUT"
+          git checkout -b "$SYNC_BRANCH"
+          # A clean merge commits itself. Conflicts are expected in
+          # Zen-specific files.
+          if git merge --no-edit "upstream/${UPSTREAM_BRANCH}"; then
+            echo "conflicts=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
-      - name: Commit merge (no conflicts)
-        if: steps.merge.outputs.conflicts == '0'
-        run: |
-          git commit --allow-empty -m \
-            "chore: merge upstream aminought/firefox-second-sidebar"
+          CONFLICTS=$(git diff --name-only --diff-filter=U | wc -l | tr -d ' ')
+          if [ "$CONFLICTS" -eq 0 ]; then
+            echo "::error::git merge failed without leaving any conflicts to resolve."
+            exit 1
+          fi
+          echo "conflicts=$CONFLICTS" >> "$GITHUB_OUTPUT"
+          {
+            echo "files<<CONFLICTED_FILES_EOF"
+            git diff --name-only --diff-filter=U
+            echo "CONFLICTED_FILES_EOF"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Stage conflict markers and commit (conflicts present)
-        if: steps.merge.outputs.conflicts != '0'
-        run: |
-          # Stage every file including those with conflict markers so the PR
-          # shows reviewers exactly what needs manual resolution.
+          # Commit every file, conflict markers included, so the PR shows
+          # reviewers exactly what needs manual resolution.
           git add -A
-          git commit -m \
-            "chore: merge upstream (conflicts need resolution)"
-          echo "Warning: ${{ steps.merge.outputs.conflicts }} merge conflict(s) were left in the branch." >> "$GITHUB_STEP_SUMMARY"
-          echo "Resolve them locally then push to complete the sync." >> "$GITHUB_STEP_SUMMARY"
+          git commit -m "chore: merge upstream (conflicts need resolution)"
+          {
+            echo "Warning: $CONFLICTS merge conflict(s) were left in the branch."
+            echo "Resolve them locally then push to complete the sync."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Push sync branch
-        run: git push origin ${{ env.SYNC_BRANCH }}
+        if: steps.plan.outputs.proceed == 'true'
+        run: git push origin "$SYNC_BRANCH"
 
       - name: Open Pull Request
-        uses: actions/github-script@v7
+        if: steps.plan.outputs.proceed == 'true'
+        uses: actions/github-script@v9
+        env:
+          NEW_COMMITS: ${{ steps.plan.outputs.new_commits }}
+          CONFLICTS: ${{ steps.merge.outputs.conflicts }}
+          CONFLICTED_FILES: ${{ steps.merge.outputs.files }}
         with:
           github-token: ${{ secrets.SYNC_PAT || secrets.GITHUB_TOKEN }}
           script: |
-            const conflicts = Number('${{ steps.merge.outputs.conflicts }}');
-            const newCommits = '${{ steps.diff.outputs.new_commits }}';
+            const { UPSTREAM_REPO, BASE_BRANCH, SYNC_BRANCH, NEW_COMMITS } =
+              process.env;
+            const conflicts = Number(process.env.CONFLICTS);
+            const conflictedFiles = (process.env.CONFLICTED_FILES ?? "")
+              .split("\n")
+              .filter(Boolean);
 
-            let body = `## Upstream sync from \`${{ env.UPSTREAM_REPO }}\`
-
-            This PR was opened automatically by the **Sync upstream** workflow.
-
-            **${newCommits} new commit(s)** from upstream are included in this branch.
-            `;
+            const body = [
+              `## Upstream sync from \`${UPSTREAM_REPO}\``,
+              "",
+              "This PR was opened automatically by the **Sync upstream** workflow.",
+              "",
+              `**${NEW_COMMITS} new commit(s)** from upstream are included in this branch.`,
+            ];
 
             if (conflicts > 0) {
-              body += `
-            ### Merge conflicts (${conflicts} file(s))
-
-            The following files are known to conflict with Zen Browser patches:
-            - \`src/second_sidebar/controllers/sidebar_main.mjs\` - uncollapse margin handling
-            - \`src/second_sidebar/css/common.mjs\` - \`--sb2-zen-*\` CSS variable definitions
-
-            **To resolve locally:**
-            \`\`\`bash
-            git fetch origin
-            git checkout ${{ env.SYNC_BRANCH }}
-            # Edit the conflicting files, keeping Zen-specific changes
-            git add <resolved-files>
-            git commit
-            git push origin ${{ env.SYNC_BRANCH }}
-            \`\`\`
-
-            See the *Upstream synchronization playbook* in \`AGENTS.md\` for full guidance.
-            `;
+              body.push(
+                "",
+                `### Merge conflicts (${conflicts} file(s))`,
+                "",
+                ...conflictedFiles.map((file) => `- \`${file}\``),
+                "",
+                "Known hotspots (see the *Upstream synchronization playbook* in `AGENTS.md`):",
+                "- `src/second_sidebar/controllers/sidebar_main.mjs` - uncollapse margin handling",
+                "- `src/second_sidebar/css/common.mjs` - `--sb2-zen-*` CSS variable definitions",
+                "",
+                "**To resolve locally:**",
+                "```bash",
+                "git fetch origin",
+                `git checkout ${SYNC_BRANCH}`,
+                "# Edit the conflicting files, keeping Zen-specific changes",
+                "git add <resolved-files>",
+                "git commit",
+                `git push origin ${SYNC_BRANCH}`,
+                "```",
+              );
             }
 
-            const { data: pr } = await github.rest.pulls.create({
-              owner: context.repo.owner,
-              repo:  context.repo.repo,
-              title: `chore: sync ${newCommits} upstream commit(s) from aminought/firefox-second-sidebar`,
-              head:  '${{ env.SYNC_BRANCH }}',
-              base:  '${{ env.BASE_BRANCH }}',
-              body:  body,
-              draft: conflicts > 0,
-            });
-            core.notice(`PR opened: ${pr.html_url}`);
+            try {
+              const { data: pr } = await github.rest.pulls.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `chore: sync ${NEW_COMMITS} upstream commit(s) from ${UPSTREAM_REPO}`,
+                head: SYNC_BRANCH,
+                base: BASE_BRANCH,
+                body: body.join("\n"),
+                draft: conflicts > 0,
+              });
+              core.notice(`PR opened: ${pr.html_url}`);
+            } catch (error) {
+              // Don't leave an orphaned sync branch behind.
+              try {
+                await github.rest.git.deleteRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `heads/${SYNC_BRANCH}`,
+                });
+              } catch (deleteError) {
+                core.warning(
+                  `Could not delete ${SYNC_BRANCH}: ${deleteError.message}`,
+                );
+              }
+              core.setFailed(
+                `Could not open the sync PR: ${error.message}. Add a SYNC_PAT ` +
+                  "secret or enable \"Allow GitHub Actions to create and " +
+                  "approve pull requests\" (see the header of this workflow).",
+              );
+            }
