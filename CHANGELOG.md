@@ -6,13 +6,15 @@ below (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-09-24
+
 ### Added
 
 - With Sine, the sidebar settings can also be changed from Sine's mod page
   (the gear button), not only from the sidebar's right-click menu. Keyboard
   shortcuts and settings export/import stay in the sidebar's own settings
   popup. Each setting is also its own `second-sidebar.*` preference in
-  `about:config`.
+  `about:config`. Restart the browser after updating for it to take effect.
 
 ## [1.2.3] - 2026-09-24
 
