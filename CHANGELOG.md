@@ -6,6 +6,8 @@ below (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-24
+
 ### Fixed
 
 - Edit and settings popups are capped to the window height and scroll their
@@ -47,6 +49,9 @@ below (see `.github/workflows/release.yml`).
   open, and deletes its branch if the PR can't be opened.
 - CI actions updated to their Node 24 versions; Prettier is pinned to the
   same version locally and in CI, and also checks JSON files.
+- The default branch is now `main` (was `master`), so Sine installs with the
+  plain `sinazadeh/zen-second-sidebar-enhanced`. Existing installs added as
+  `.../tree/master` keep working.
 
 ## [1.1.0] - 2026-09-21
 
