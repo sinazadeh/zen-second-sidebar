@@ -6,6 +6,8 @@ below (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
 
+## [1.2.5] - 2026-09-24
+
 ### Fixed
 
 - Web panel buttons no longer stay blank when a site's icon can't be loaded
