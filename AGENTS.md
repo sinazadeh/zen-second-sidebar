@@ -117,9 +117,9 @@ Follow an existing setting through these files under `src/second_sidebar/`:
 Both settings dialogs apply changes live, and Save persists them. Closing
 without saving (Cancel, Escape, clicking outside) asks for confirmation when
 something changed, then rolls each changed field back through the popup's
-`#getChangeReverters()` list (upstream code, from
-aminought/firefox-second-sidebar#210). When adding a setting to either popup,
-add its reverter there too, or discarding changes will leave it applied.
+`#getChangeReverters()` list (upstream code, so keep it close to upstream's
+shape to ease merges). When adding a setting to either popup, add its
+reverter there too, or discarding changes will leave it applied.
 
 Settings export/import (sidebar settings popup → `sidebar_main_settings.mjs`,
 file format in `settings/settings_export.mjs`) writes a single JSON file:
@@ -183,8 +183,7 @@ exports.
   including ones lacking `gBrowser`/the sidebar's expected DOM.
 - **Sine's `sine.allow-unsafe-js` gate**: this is not something this repo
   controls, but it's the single most likely reason "installed via Sine but
-  the sidebar never appears" gets reported (see
-  [#4](https://github.com/sinazadeh/zen-second-sidebar-enhanced/issues/4) triage).
+  the sidebar never appears" gets reported.
   In `core/utils.sys.mjs`'s `getScripts()`, a mod's scripts are only ever
   added to Sine's load list when `this.allowUnsafeJS || mod.origin ===
 "store"`. A mod installed by pasting a repository (as opposed to Sine's
@@ -202,15 +201,10 @@ exports.
   disabling fx-autoconfig's own `chrome/JS/`-scanning bootstrap on **every
   other profile on the same installation**, not just the one Sine was set
   up on. Sine's own mod registry (`mods.json`) is per-profile, so a profile
-  that only had this addon copied into `chrome/JS/` the old way ends up
-  with _no_ loader running it at all once this happens - not a caching
-  issue, not a code regression, just no active bootstrap left that knows
-  about it. This was the actual root cause behind
-  [#4](https://github.com/sinazadeh/zen-second-sidebar-enhanced/issues/4)'s report
-  once traced fully: it isn't "doesn't detect Sine's startup" (that part is
-  the `browser-delayed-startup-finished` fallback above), it's "a sibling
-  profile's Sine install silently retired the loader this profile depended
-  on." Don't assume a report of "stopped working after installing Sine" is
+  that only has this addon copied into `chrome/JS/` ends up with _no_
+  loader running it at all once this happens - not a caching issue, not a
+  code regression, just no active bootstrap left that knows about it.
+  Don't assume a report of "stopped working after installing Sine" is
   about the same profile Sine was added to - ask about sibling profiles on
   the same installation before chasing a code-level cause.
 - **Default branch is `main`** (renamed from `master`; upstream still uses
@@ -228,14 +222,12 @@ exports.
   cleanliness" - that trades a cosmetic win for permanent merge friction.
 - **Double-injection guard**: `run()` in `second_sidebar.uc.mjs` sets a
   `sb2-injected` class on `BrowserElements.root` before doing anything else,
-  and bails out if it's already set. This exists for
-  [#4](https://github.com/sinazadeh/zen-second-sidebar-enhanced/issues/4): a profile
-  with this addon set up both the old way (copied into fx-autoconfig's
-  `chrome/JS/`) and the new way (installed as a Sine mod) could otherwise
-  have both loaders inject into the same window, producing duplicate
-  `#sb2-*` elements with colliding ids. Keep the class set synchronously,
-  before the first `await`, so two near-simultaneous invocations can't both
-  pass the check.
+  and bails out if it's already set. A profile can have this addon both
+  copied into fx-autoconfig's `chrome/JS/` and installed as a Sine mod;
+  without the guard both loaders inject into the same window, producing
+  duplicate `#sb2-*` elements with colliding ids. Keep the class set
+  synchronously, before the first `await`, so two near-simultaneous
+  invocations can't both pass the check.
 - Preserve startup ordering: wait for `UC_API.Runtime.startupFinished()` or
   `delayedStartupPromise` (fx-autoconfig) or the `browser-delayed-startup-finished`
   observer fallback in `second_sidebar.uc.mjs` (Sine, which defines neither
@@ -313,11 +305,11 @@ exports.
   temporary-module cleanup in `utils/files.mjs`. Keep these patches isolated
   rather than spreading source rewriting through controllers.
 - `UrlbarInputPatcher#patchValueFormatterUpdate` only applies to Firefox
-  versions with a public `gURLBar.valueFormatter`. Current Firefox (where
-  `gURLBar` is a `<moz-urlbar>` element) keeps the formatter private and
-  makes `update()` async, so it can no longer throw inside `removeTab()`; the
-  patch detects that and skips itself, and any rejected promise is filtered
-  by `#suppressValueFormatterErrors`. Its retry loop is capped (30 s) so it
+  versions with a public `gURLBar.valueFormatter`. Where `gURLBar` is a
+  `<moz-urlbar>` element, the formatter is private and `update()` is async,
+  so it can't throw inside `removeTab()`; the patch detects that and skips
+  itself, and any rejected promise is filtered by
+  `#suppressValueFormatterErrors`. Its retry loop is capped (30 s) so it
   can't poll forever.
 
 ## Static checks
@@ -360,10 +352,9 @@ Do not reformat unrelated files to clear an existing repository-wide failure.
 On PowerShell, `npm.cmd`/`npx.cmd` can be used if `.ps1` launchers are blocked.
 
 CI installs ESLint 9.7.0 and uploads SARIF using
-`@microsoft/eslint-formatter-sarif@3.1.0`. The lint step no longer uses
-`continue-on-error` (removed once the repo reached a clean baseline) - a
-lint error now fails the workflow, so don't reintroduce that flag as a way
-to land something that doesn't pass. The SARIF report is generated and
+`@microsoft/eslint-formatter-sarif@3.1.0`. A lint error fails the workflow;
+don't add `continue-on-error` as a way to land something that doesn't pass.
+The SARIF report is generated and
 uploaded even when the lint step fails. The Prettier workflow uses a dry run
 via `creyD/prettier_action`, pinned (`prettier_version`) to the same
 Prettier version as the local setup command above; keep the two in sync
@@ -490,8 +481,8 @@ git push origin main
 
 ### Known conflict hotspots
 
-These two files are the most likely to conflict because upstream changes their
-code paths that were also modified by the Zen port:
+These files are the most likely to conflict because upstream changes code
+this fork has also modified:
 
 1. **`src/second_sidebar/controllers/sidebar_main.mjs`** — `uncollapse()` method:
    - **Keep** `removeProperty("margin-right")` / `removeProperty("margin-left")`
@@ -504,6 +495,10 @@ code paths that were also modified by the Zen port:
    - **Accept** any new upstream `@media -moz-pref("browser.nova.enabled")` blocks.
    - **Keep** both `#browser,` and `#zen-tabbox-wrapper {` in the `position: relative`
      rule at the bottom of the file.
+
+3. **`.github/workflows/*.yml`** — upstream's workflows trigger on `master`, and
+   its ESLint lint step sets `continue-on-error: true`:
+   - **Keep** this fork's `branches: ["main"]` triggers and its failing lint step.
 
 `theme.json`, `wrappers/directory_service.mjs`, and the loader-portability
 fixes described above are fork-only additions upstream doesn't have, so
