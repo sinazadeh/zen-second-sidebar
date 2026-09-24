@@ -158,16 +158,24 @@ export class SidebarMainCollapser {
     const sidebarRect = SidebarElements.sidebarMain.getBoundingClientRect();
     const leftEdge = window.mozInnerScreenX;
     const rightEdge = leftEdge + rootRect.width;
+    const screenX = this.#getScreenX(event, leftEdge);
 
     const isInUncollapseArea =
       (collapsed &&
-        ((isRight && event.screenX > rightEdge - TRIGGER_WIDTH) ||
-          (isLeft && event.screenX < leftEdge + TRIGGER_WIDTH))) ||
+        ((isRight && screenX > rightEdge - TRIGGER_WIDTH) ||
+          (isLeft && screenX < leftEdge + TRIGGER_WIDTH))) ||
       (!collapsed &&
-        ((isRight && event.screenX > rightEdge - sidebarRect.width) ||
-          (isLeft && event.screenX < leftEdge + sidebarRect.width)));
+        ((isRight && screenX > rightEdge - sidebarRect.width) ||
+          (isLeft && screenX < leftEdge + sidebarRect.width)));
 
-    const hitTest = { isRight, collapsed, leftEdge, rightEdge, sidebarRect };
+    const hitTest = {
+      isRight,
+      collapsed,
+      screenX,
+      leftEdge,
+      rightEdge,
+      sidebarRect,
+    };
     if (isInUncollapseArea) {
       if (collapsed && !this.showSidebarTimer) {
         this.#logHoverDecision("show", event, hitTest);
@@ -182,6 +190,31 @@ export class SidebarMainCollapser {
   }
 
   /**
+   * Horizontal screen position of a mouse event, in this window's CSS
+   * pixels. Events from inside a web panel bubble up here from the web
+   * panels' embedded window, but their screenX doesn't match this window's
+   * mozInnerScreenX: at the right edge of a 1914px Zen window on Windows it
+   * put the pointer ~80px further right than it was, so the sidebar showed
+   * (and stayed shown) far from the edge (issue #10). Map those events
+   * through the embedded browser's box in this window instead.
+   *
+   * @param {MouseEvent} event
+   * @param {number} leftEdge This window's mozInnerScreenX.
+   * @returns {number}
+   */
+  #getScreenX(event, leftEdge) {
+    const webPanelsBrowser = SidebarElements.webPanelsBrowser.getXUL();
+    const view = event.view;
+    if (!view || view !== webPanelsBrowser.contentWindow || !view.innerWidth) {
+      return event.screenX;
+    }
+    const rect = webPanelsBrowser.getBoundingClientRect();
+    return (
+      leftEdge + rect.left + (event.clientX / view.innerWidth) * rect.width
+    );
+  }
+
+  /**
    * Debug-only record of what auto-hide based a show/hide decision on, in
    * screen pixels, so a report of it triggering in the wrong place can be
    * diagnosed from the Browser Console.
@@ -191,6 +224,7 @@ export class SidebarMainCollapser {
    * @param {object} hitTest
    * @param {boolean} hitTest.isRight
    * @param {boolean} hitTest.collapsed
+   * @param {number} hitTest.screenX
    * @param {number} hitTest.leftEdge
    * @param {number} hitTest.rightEdge
    * @param {DOMRect} hitTest.sidebarRect
@@ -198,7 +232,7 @@ export class SidebarMainCollapser {
   #logHoverDecision(
     action,
     event,
-    { isRight, collapsed, leftEdge, rightEdge, sidebarRect },
+    { isRight, collapsed, screenX, leftEdge, rightEdge, sidebarRect },
   ) {
     if (!Logger.enabled) {
       return;
@@ -213,9 +247,11 @@ export class SidebarMainCollapser {
     const targetName = `${target?.localName ?? "?"}${target?.id ? "#" + target.id : ""}`;
     const view =
       event.view === window ? "browser window" : (event.view?.name ?? "?");
+    const rawScreenX =
+      screenX === event.screenX ? "" : ` (event screenX ${event.screenX})`;
     Logger.debug(
       `Auto-hide: ${action} sidebar on ${event.type} at screenX ` +
-        `${Math.round(event.screenX)}; zone ${range(zone)}, window ` +
+        `${Math.round(screenX)}${rawScreenX}; zone ${range(zone)}, window ` +
         `${range([leftEdge, rightEdge])}, sidebar ${range(sidebar)}, ` +
         `target ${targetName} in ${view}`,
     );

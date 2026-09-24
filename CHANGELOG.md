@@ -6,6 +6,13 @@ below (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
 
+### Fixed
+
+- With auto-hide on, moving the mouse over an open web panel showed the
+  sidebar well before the pointer reached the window edge, and kept it shown
+  after the pointer moved back onto the panel
+  ([#10](https://github.com/sinazadeh/zen-second-sidebar-enhanced/issues/10)).
+
 ## [1.2.0] - 2026-09-24
 
 ### Fixed
