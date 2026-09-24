@@ -6,6 +6,17 @@ below (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-09-24
+
+### Fixed
+
+- On Wayland, settings popups opened from a web panel low in the sidebar (or
+  by right-clicking low on it) no longer run off the bottom of the screen:
+  they open towards the side with more room and scroll to fit
+  ([#6](https://github.com/sinazadeh/zen-second-sidebar-enhanced/issues/6)).
+  `second-sidebar.fit-popups-to-window` turns this on (`true`) or off
+  (`false`) on any platform.
+
 ## [1.2.0] - 2026-09-24
 
 ### Fixed

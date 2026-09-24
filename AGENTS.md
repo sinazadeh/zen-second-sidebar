@@ -268,6 +268,14 @@ exports.
 - **GPU compositing on Windows (Zen)**: Switching or showing web panels on Windows
   under Zen can occasionally leave a blank frame. `WebPanelsBrowser.forceRepaint()`
   briefly toggles `opacity: 0.9999` to force the compositor to paint content.
+- Open settings-style popups (`.sb2-popup`) with
+  `Panel#openPopupWithinWindow` / `#openPopupAtScreenWithinWindow`, not
+  plain `openPopup`/`openPopupAtScreen`. On Wayland, Firefox leaves popups
+  that don't fit on screen to the compositor, which may not move them back,
+  so these methods open the popup towards the side of its anchor with more
+  room and cap its height to that room (`--sb2-popup-max-height` in
+  `css/popups.mjs`). The `second-sidebar.fit-popups-to-window` pref forces
+  this on (`true`) or off (`false`) on any platform.
 - Reuse widget readiness helpers such as `doWhenButtonReady`; CustomizableUI
   instances are not always available synchronously in every window.
 - Use `controllers/events.mjs` for cross-window actions. Preserve event names,
