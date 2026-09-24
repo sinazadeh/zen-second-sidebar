@@ -1,19 +1,19 @@
 import { SidebarEvents, sendEvents } from "./events.mjs";
+import {
+  buildSettingsExport,
+  parseSettingsExport,
+} from "../settings/settings_export.mjs";
 
+import { AppStartupWrapper } from "../wrappers/app_startup.mjs";
 import { FilePickerWrapper } from "../wrappers/file_picker.mjs";
 import { IOUtilsWrapper } from "../wrappers/io_utils.mjs";
 import { PromptServiceWrapper } from "../wrappers/prompt.mjs";
 import { SidebarControllers } from "../sidebar_controllers.mjs";
 import { SidebarElements } from "../sidebar_elements.mjs";
-import { SidebarSettings } from "../settings/sidebar_settings.mjs";
-import { WebPanelSettings } from "../settings/web_panel_settings.mjs";
-import { WebPanelsSettings } from "../settings/web_panels_settings.mjs";
 import { WindowWrapper } from "../wrappers/window.mjs";
 
-// Bump when the exported shape changes in a way old exports can't just be
-// read as (a field renamed or repurposed, not just a new optional field -
-// those already default fine via the settings classes' own constructors).
-const EXPORT_VERSION = 1;
+const EXPORT_TITLE = "Export Second Sidebar Settings";
+const IMPORT_TITLE = "Import Second Sidebar Settings";
 
 export class SidebarMainSettingsController {
   constructor() {
@@ -105,41 +105,34 @@ export class SidebarMainSettingsController {
   }
 
   /**
-   * Writes the sidebar settings and every web panel's settings (not their
-   * per-panel state, e.g. lastUrl - see AGENTS.md on keeping those
-   * distinct) to a single JSON file the user picks.
+   * Writes the sidebar settings and every web panel's settings (see
+   * buildSettingsExport) to a single JSON file the user picks.
    */
   async #exportSettings() {
     const window = new WindowWrapper().raw;
     const path = await FilePickerWrapper.pickSaveFile(
       window,
-      "Export Second Sidebar Settings",
+      EXPORT_TITLE,
       "second-sidebar-settings.json",
     );
     if (!path) return;
 
     try {
-      const data = {
-        version: EXPORT_VERSION,
-        exportedAt: new Date().toISOString(),
-        sidebarSettings: SidebarControllers.sidebarController
-          .dumpSettings()
-          .toObject(),
-        webPanels: SidebarControllers.webPanelsController
-          .dumpSettings()
-          .webPanels.map((webPanel) => webPanel.toObject()),
-      };
+      const data = buildSettingsExport(
+        SidebarControllers.sidebarController.dumpSettings(),
+        SidebarControllers.webPanelsController.dumpSettings(),
+      );
       await IOUtilsWrapper.writeUTF8(path, JSON.stringify(data, null, 2));
       PromptServiceWrapper.alert(
         window,
-        "Export Second Sidebar Settings",
+        EXPORT_TITLE,
         "Settings exported successfully.",
       );
     } catch (error) {
       console.error("Second Sidebar: failed to export settings", error);
       PromptServiceWrapper.alert(
         window,
-        "Export Second Sidebar Settings",
+        EXPORT_TITLE,
         "Failed to export settings. See the Browser Console for details.",
       );
     }
@@ -153,50 +146,60 @@ export class SidebarMainSettingsController {
    * per-field event system (see #setupListeners here and in
    * WebPanelsController) isn't built to do safely in a single shot. A
    * restart picks the new settings up the same way any fresh window does.
+   *
+   * Until that restart, every open window still holds its pre-import
+   * settings, and many ordinary actions (opening, moving or resizing a
+   * panel, ...) save them - which would silently overwrite the import. So
+   * settings saves are suspended in every window first, and the user is
+   * offered an immediate restart. The suspension is never lifted, even if
+   * writing fails: after an earlier import, resuming would let windows save
+   * their pre-import settings over it.
    */
   async #importSettings() {
     const window = new WindowWrapper().raw;
-    const path = await FilePickerWrapper.pickOpenFile(
-      window,
-      "Import Second Sidebar Settings",
-    );
+    const path = await FilePickerWrapper.pickOpenFile(window, IMPORT_TITLE);
     if (!path) return;
 
+    let imported;
     try {
-      const data = JSON.parse(await IOUtilsWrapper.readUTF8(path));
-      if (!data.sidebarSettings || !Array.isArray(data.webPanels)) {
-        throw new Error(
-          "file does not look like a Second Sidebar settings export",
-        );
-      }
-
-      const sidebarSettings = new SidebarSettings(data.sidebarSettings);
-      const defaultFloatingOffsetCSS = `var(--space-${sidebarSettings.defaultFloatingOffset})`;
-      const webPanelsSettings = new WebPanelsSettings(
-        data.webPanels.map((webPanel) =>
-          WebPanelSettings.fromObject(
-            sidebarSettings.position,
-            defaultFloatingOffsetCSS,
-            webPanel,
-          ),
-        ),
-      );
-
-      sidebarSettings.save();
-      await webPanelsSettings.save();
-
-      PromptServiceWrapper.alert(
-        window,
-        "Import Second Sidebar Settings",
-        "Settings imported. Restart the browser for the change to fully take effect.",
+      imported = parseSettingsExport(
+        JSON.parse(await IOUtilsWrapper.readUTF8(path)),
       );
     } catch (error) {
       console.error("Second Sidebar: failed to import settings", error);
       PromptServiceWrapper.alert(
         window,
-        "Import Second Sidebar Settings",
-        "Failed to import settings: the file may be invalid or corrupted. See the Browser Console for details.",
+        IMPORT_TITLE,
+        `Failed to import settings: ${error.message}. See the Browser Console for details.`,
       );
+      return;
+    }
+
+    sendEvents(SidebarEvents.SUSPEND_SETTINGS_SAVES);
+    try {
+      await imported.webPanelsSettings.save();
+      imported.sidebarSettings.save();
+    } catch (error) {
+      console.error("Second Sidebar: failed to write imported settings", error);
+      PromptServiceWrapper.alert(
+        window,
+        IMPORT_TITLE,
+        "Failed to import settings: they could not be written to disk. See the Browser Console for details.\n\n" +
+          "Restart the browser before changing any settings: until then, changes to the sidebar or web panels won't be saved.",
+      );
+      return;
+    }
+
+    const restartNow = PromptServiceWrapper.confirm(
+      window,
+      IMPORT_TITLE,
+      "Settings imported. Restart the browser now to apply them?\n\n" +
+        "Until the browser restarts, changes to the sidebar or web panels won't be saved.",
+      "Restart Now",
+      "Later",
+    );
+    if (restartNow) {
+      AppStartupWrapper.restart();
     }
   }
 }

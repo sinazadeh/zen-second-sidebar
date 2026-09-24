@@ -24,12 +24,14 @@ const run = () => {
   BrowserElements.root.addClass("sb2-injected");
 
   ContextualIdentityServiceWrapper.ensureDataReady();
-  SidebarInjector.inject().then((injected) => {
-    if (injected) {
-      SidebarDecorator.decorate();
-      CustomizeModePatcher.patch();
-    }
-  });
+  SidebarInjector.inject()
+    .then((injected) => {
+      if (injected) {
+        SidebarDecorator.decorate();
+        CustomizeModePatcher.patch();
+      }
+    })
+    .catch((error) => console.error("Second Sidebar: failed to load", error));
 };
 
 const runAfterStartup = () => {

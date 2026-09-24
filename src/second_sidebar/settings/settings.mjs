@@ -1,5 +1,6 @@
 import { PreferencesWrapper } from "../wrappers/preferences.mjs";
 import {
+  backupFile,
   fileExists,
   migrateLegacyFile,
   readFile,
@@ -16,10 +17,18 @@ export class Settings {
     if (!PreferencesWrapper.prefHasUserValue(pref)) {
       return null;
     }
+    const value = PreferencesWrapper.getStringPref(pref);
     try {
-      return JSON.parse(PreferencesWrapper.getStringPref(pref));
+      return JSON.parse(value);
     } catch (error) {
-      console.error(`Failed to parse pref "${pref}", using defaults:`, error);
+      // The next save replaces the unreadable value with defaults, so keep
+      // a copy for the user to recover from.
+      const backupPref = `${pref}.corrupt`;
+      PreferencesWrapper.setStringPref(backupPref, value);
+      console.error(
+        `Failed to parse pref "${pref}", using defaults. Its value was kept in "${backupPref}":`,
+        error,
+      );
       return null;
     }
   }
@@ -54,7 +63,19 @@ export class FileSettings {
       try {
         return JSON.parse(await readFile(path));
       } catch (error) {
-        console.error(`Failed to parse "${path}", using defaults:`, error);
+        // The next save overwrites the unreadable file with defaults (e.g.
+        // an empty panel list), so keep a copy for the user to recover from.
+        let backupPath = null;
+        try {
+          backupPath = await backupFile(path, "corrupt");
+        } catch (backupError) {
+          console.error(`Failed to back up "${path}":`, backupError);
+        }
+        console.error(
+          `Failed to read "${path}", using defaults.` +
+            (backupPath ? ` A copy was kept as "${backupPath}".` : ""),
+          error,
+        );
         return null;
       }
     }
@@ -68,7 +89,7 @@ export class FileSettings {
         return value;
       } catch (error) {
         console.error(
-          `Failed to parse legacy pref "${legacyPref}", using defaults:`,
+          `Failed to parse legacy pref "${legacyPref}", using defaults. The pref was left in place:`,
           error,
         );
         return null;

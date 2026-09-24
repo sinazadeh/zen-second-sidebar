@@ -50,6 +50,28 @@ export async function removeFile(relativePath) {
 }
 
 /**
+ * Copies a data file next to itself under a timestamped name, e.g.
+ * `web-panels.json` -> `web-panels.corrupt-2026-09-24T10-00-00-000Z.json`.
+ *
+ * @param {string} relativePath
+ * @param {string} label
+ * @returns {Promise<string>} the copy's relative path
+ */
+export async function backupFile(relativePath, label) {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const extensionIndex = relativePath.lastIndexOf(".");
+  const backupPath =
+    extensionIndex > relativePath.lastIndexOf("/")
+      ? `${relativePath.slice(0, extensionIndex)}.${label}-${timestamp}${relativePath.slice(extensionIndex)}`
+      : `${relativePath}.${label}-${timestamp}`;
+  await IOUtilsWrapper.copy(
+    makeDataPath(relativePath),
+    makeDataPath(backupPath),
+  );
+  return backupPath;
+}
+
+/**
  *
  * @param {string} relativePath
  * @returns {string}

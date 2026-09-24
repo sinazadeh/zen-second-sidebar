@@ -6,6 +6,7 @@ import {
 } from "./events.mjs";
 
 import { BrowserElements } from "../browser_elements.mjs";
+import { Logger } from "../utils/logger.mjs";
 import { SidebarControllers } from "../sidebar_controllers.mjs";
 import { SidebarElements } from "../sidebar_elements.mjs";
 import { SidebarSettings } from "../settings/sidebar_settings.mjs";
@@ -14,6 +15,8 @@ import { changeContainerBorder } from "../utils/containers.mjs";
 import { isLeftMouseButton } from "../utils/buttons.mjs";
 
 export class SidebarController {
+  #settingsSavesSuspended = false;
+
   constructor() {
     this.#setupListeners();
 
@@ -78,6 +81,10 @@ export class SidebarController {
       if (!webPanelController.isUnloaded()) {
         webPanelController.unload();
       }
+    });
+
+    listenEvent(SidebarEvents.SUSPEND_SETTINGS_SAVES, () => {
+      this.#settingsSavesSuspended = true;
     });
 
     listenEvent(SidebarEvents.EDIT_SIDEBAR_POSITION, (event) => {
@@ -468,6 +475,13 @@ export class SidebarController {
   }
 
   saveSettings() {
+    // Set while an import is pending a restart (see
+    // SidebarMainSettingsController#importSettings): this window's settings
+    // predate the import, so saving them would silently undo it.
+    if (this.#settingsSavesSuspended) {
+      Logger.debug("Sidebar settings save skipped: import pending restart");
+      return;
+    }
     this.dumpSettings().save();
   }
 }
