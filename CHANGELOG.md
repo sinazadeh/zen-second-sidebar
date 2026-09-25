@@ -6,6 +6,13 @@ below (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
 
+### Fixed
+
+- The find bar in a web panel still covered half the page with mods or
+  `userChrome.css` that move the find bar into a column beside the page. It
+  is now pinned across the bottom of the panel, whatever the page layout
+  styles say.
+
 ## [1.2.6] - 2026-09-25
 
 ### Fixed

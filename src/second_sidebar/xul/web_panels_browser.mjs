@@ -39,32 +39,28 @@ const MAIN_WINDOW_COMMANDS = new Set([
   "Tools:Search",
 ]);
 
-// Themes and mods that float the find bar size and place it against the
-// whole window, which in a narrow panel covers half the page. Keep it
-// docked below the page, as Firefox lays it out. Loaded as an agent sheet,
-// so it wins over their `!important` rules.
+// Themes and mods restyle the find bar for the main window: floating it,
+// or moving the content grid's findbar area into a side column. In a narrow
+// panel either covers half the page. Pin it across the bottom of the page
+// instead, out of the grid so no template can move it (it overlays the
+// page's last few pixels while open). Loaded as an agent sheet, so it wins
+// over their `!important` rules.
 const DOCKED_FINDBAR_CSS = `
-  .browserContainer > findbar {
-    position: static !important;
-    inset: auto !important;
-    grid-area: findbar !important;
-    place-self: stretch !important;
+  findbar {
+    position: absolute !important;
+    grid-area: auto !important;
+    inset: auto 0 0 0 !important;
     width: auto !important;
-    min-width: 1px !important;
+    min-width: 0 !important;
     max-width: none !important;
     height: auto !important;
     min-height: 0 !important;
     max-height: none !important;
+    margin: 0 !important;
     transform: none !important;
     translate: none !important;
     scale: none !important;
-    margin-inline: 0 !important;
-    margin-top: 0 !important;
-    z-index: auto !important;
-  }
-
-  .browserContainer > findbar:not([hidden]) {
-    margin-bottom: 0 !important;
+    z-index: 2 !important;
   }
 `;
 
