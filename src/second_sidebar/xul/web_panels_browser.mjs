@@ -8,6 +8,7 @@ import { ScriptSecurityManagerWrapper } from "../wrappers/script_security_manage
 import { SessionStoreWrapper } from "../wrappers/session_store.mjs";
 import { Style } from "./base/style.mjs";
 import { UrlbarInputPatcher } from "../patchers/urlbar_input_patcher.mjs";
+import { WEB_PANEL_FINDBAR_CSS } from "../css/findbar.mjs";
 import { BROWSER_CONTAINER_SELECTORS } from "../utils/browser_layout.mjs";
 import { markZenWindowUnsynced } from "../utils/zen.mjs";
 import { WebPanelSettings } from "../settings/web_panel_settings.mjs"; // eslint-disable-line no-unused-vars
@@ -38,35 +39,6 @@ const MAIN_WINDOW_COMMANDS = new Set([
   "Browser:OpenLocation",
   "Tools:Search",
 ]);
-
-// Themes and mods that float the find bar size and place it against the
-// whole window, which in a narrow panel covers half the page. Keep it
-// docked below the page, as Firefox lays it out. Loaded as an agent sheet,
-// so it wins over their `!important` rules.
-const DOCKED_FINDBAR_CSS = `
-  .browserContainer > findbar {
-    position: static !important;
-    inset: auto !important;
-    grid-area: findbar !important;
-    place-self: stretch !important;
-    width: auto !important;
-    min-width: 1px !important;
-    max-width: none !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    transform: none !important;
-    translate: none !important;
-    scale: none !important;
-    margin-inline: 0 !important;
-    margin-top: 0 !important;
-    z-index: auto !important;
-  }
-
-  .browserContainer > findbar:not([hidden]) {
-    margin-bottom: 0 !important;
-  }
-`;
 
 export class WebPanelsBrowser extends Browser {
   constructor() {
@@ -263,7 +235,7 @@ export class WebPanelsBrowser extends Browser {
     // Add class for userChrome.css
     windowRoot.addClass("sb2-webpanels-window");
 
-    this.window.loadAgentSheet(DOCKED_FINDBAR_CSS);
+    this.window.loadAgentSheet(WEB_PANEL_FINDBAR_CSS);
     this.#runWindowCommandsInMainWindow();
 
     // Close first dialog window within first 5 seconds

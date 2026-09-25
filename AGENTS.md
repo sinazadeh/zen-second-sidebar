@@ -258,10 +258,16 @@ exports.
   (capturing `command` listener) and run on the main window's matching
   `<command>` instead: otherwise Zen opens its new-tab address bar in the
   hidden window, and reopening a closed tab can restore a panel's own tab.
-  Page commands (find, reload, zoom, print) stay in the panel. The nested
-  window also gets an agent-level sheet (`WindowWrapper#loadAgentSheet`)
-  keeping the find bar docked, since mods load their CSS as user sheets
-  with `!important`.
+  Page commands (find, reload, zoom, print) stay in the panel.
+- Mods can float the find bar, stretch it over the page, or redefine
+  `.browserContainer`'s grid so its `findbar` area is a side column, which
+  covers half of a narrow web panel. Putting it back in that area isn't
+  enough, so the panels' window gets an agent-level sheet
+  (`css/findbar.mjs`, loaded with `WindowWrapper#loadAgentSheet`, since
+  mods load their CSS as user sheets with `!important`) pinning it across
+  the bottom with absolute positioning and `grid-area: auto`. Leave the
+  main window's find bar to Zen and the user's mods: the owner asked for
+  that after a main-window override misbehaved when the window was resized.
 - Mouse events inside a web panel bubble from that nested window up to the
   main window's listeners (its `<browser>` is the nested window's chrome
   event handler), so `event.target` can belong to the panel's document (see
