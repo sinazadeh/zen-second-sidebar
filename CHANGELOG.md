@@ -12,6 +12,9 @@ below (see `.github/workflows/release.yml`).
   `userChrome.css` that move the find bar into a column beside the page. It
   is now pinned across the bottom of the panel, whatever the page layout
   styles say.
+- The main window's find bar can also cover half the page with such mods. It
+  now always sits in its own row below the page, as in Firefox without mods.
+  This replaces a mod's floating find bar in the main window too.
 
 ## [1.2.6] - 2026-09-25
 

@@ -8,6 +8,7 @@ import { ScriptSecurityManagerWrapper } from "../wrappers/script_security_manage
 import { SessionStoreWrapper } from "../wrappers/session_store.mjs";
 import { Style } from "./base/style.mjs";
 import { UrlbarInputPatcher } from "../patchers/urlbar_input_patcher.mjs";
+import { WEB_PANEL_FINDBAR_CSS } from "../css/findbar.mjs";
 import { BROWSER_CONTAINER_SELECTORS } from "../utils/browser_layout.mjs";
 import { markZenWindowUnsynced } from "../utils/zen.mjs";
 import { WebPanelSettings } from "../settings/web_panel_settings.mjs"; // eslint-disable-line no-unused-vars
@@ -38,31 +39,6 @@ const MAIN_WINDOW_COMMANDS = new Set([
   "Browser:OpenLocation",
   "Tools:Search",
 ]);
-
-// Themes and mods restyle the find bar for the main window: floating it,
-// or moving the content grid's findbar area into a side column. In a narrow
-// panel either covers half the page. Pin it across the bottom of the page
-// instead, out of the grid so no template can move it (it overlays the
-// page's last few pixels while open). Loaded as an agent sheet, so it wins
-// over their `!important` rules.
-const DOCKED_FINDBAR_CSS = `
-  findbar {
-    position: absolute !important;
-    grid-area: auto !important;
-    inset: auto 0 0 0 !important;
-    width: auto !important;
-    min-width: 0 !important;
-    max-width: none !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    margin: 0 !important;
-    transform: none !important;
-    translate: none !important;
-    scale: none !important;
-    z-index: 2 !important;
-  }
-`;
 
 export class WebPanelsBrowser extends Browser {
   constructor() {
@@ -259,7 +235,7 @@ export class WebPanelsBrowser extends Browser {
     // Add class for userChrome.css
     windowRoot.addClass("sb2-webpanels-window");
 
-    this.window.loadAgentSheet(DOCKED_FINDBAR_CSS);
+    this.window.loadAgentSheet(WEB_PANEL_FINDBAR_CSS);
     this.#runWindowCommandsInMainWindow();
 
     // Close first dialog window within first 5 seconds

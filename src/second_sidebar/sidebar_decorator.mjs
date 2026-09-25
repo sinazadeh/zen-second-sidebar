@@ -2,6 +2,7 @@ import { COMMON_CSS } from "./css/common.mjs";
 import { CONTAINERS_CSS } from "./css/containers.mjs";
 import { CONTEXT_ITEM_CSS } from "./css/context_item.mjs";
 import { CUSTOMIZATION_CSS } from "./css/customization.mjs";
+import { MAIN_WINDOW_FINDBAR_CSS } from "./css/findbar.mjs";
 import { POPUPS_CSS } from "./css/popups.mjs";
 import { SIDEBAR_BOX_CSS } from "./css/sidebar_box.mjs";
 import { SIDEBAR_MAIN_CSS } from "./css/sidebar_main.mjs";
@@ -11,6 +12,7 @@ import { SIDEBAR_WRAPPER_CSS } from "./css/sidebar_wrapper.mjs";
 import { SidebarControllers } from "./sidebar_controllers.mjs";
 import { WEB_PANELS_BROWSER_CSS } from "./css/web_panels_browser.mjs";
 import { WEB_PANEL_CSS } from "./css/web_panel.mjs";
+import { WindowWrapper } from "./wrappers/window.mjs";
 
 const STYLE =
   COMMON_CSS +
@@ -32,6 +34,8 @@ export class SidebarDecorator {
     const style = document.createElement("style");
     style.innerHTML = STYLE;
     document.querySelector("head").appendChild(style);
+    // An agent sheet, so it wins over mods' !important rules for the find bar.
+    new WindowWrapper().loadAgentSheet(MAIN_WINDOW_FINDBAR_CSS);
     this.#collapse();
   }
 
