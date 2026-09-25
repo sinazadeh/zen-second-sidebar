@@ -6,6 +6,8 @@ below (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
 
+## [1.2.6] - 2026-09-25
+
 ### Fixed
 
 - Ctrl+T (new tab), Ctrl+Shift+T (reopen closed tab), Ctrl+L (address bar)
