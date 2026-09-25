@@ -6,6 +6,8 @@ below (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
 
+## [1.2.7] - 2026-09-25
+
 ### Fixed
 
 - The find bar in a web panel still covered half the page with mods or
