@@ -260,15 +260,14 @@ exports.
   hidden window, and reopening a closed tab can restore a panel's own tab.
   Page commands (find, reload, zoom, print) stay in the panel.
 - Mods can float the find bar, stretch it over the page, or redefine
-  `.browserContainer`'s grid so its `findbar` area is a side column, so
-  putting it back in that area isn't enough. `css/findbar.mjs` has two
-  agent-level sheets for it (`WindowWrapper#loadAgentSheet`, since mods load
-  their CSS as user sheets with `!important`). The panels' window pins it
-  across the bottom with absolute positioning and `grid-area: auto`. The main
-  window (loaded by `SidebarDecorator`) keeps Firefox's layout: a row under
-  the page, placed from the page's own `browserstack` grid lines, and taken
-  out of flow while hidden. Without a mod, the main window's find bar must
-  stay exactly where Firefox puts it, so check any change against that too.
+  `.browserContainer`'s grid so its `findbar` area is a side column, which
+  covers half of a narrow web panel. Putting it back in that area isn't
+  enough, so the panels' window gets an agent-level sheet
+  (`css/findbar.mjs`, loaded with `WindowWrapper#loadAgentSheet`, since
+  mods load their CSS as user sheets with `!important`) pinning it across
+  the bottom with absolute positioning and `grid-area: auto`. Leave the
+  main window's find bar to Zen and the user's mods: the owner asked for
+  that after a main-window override misbehaved when the window was resized.
 - Mouse events inside a web panel bubble from that nested window up to the
   main window's listeners (its `<browser>` is the nested window's chrome
   event handler), so `event.target` can belong to the panel's document (see
