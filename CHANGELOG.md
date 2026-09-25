@@ -6,6 +6,19 @@ below (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
 
+## [1.2.6] - 2026-09-25
+
+### Fixed
+
+- Ctrl+T (new tab), Ctrl+Shift+T (reopen closed tab), Ctrl+L (address bar)
+  and Ctrl+K (web search) pressed while a web panel has focus now act on the
+  browser window instead of the panel's hidden one. In Zen, Ctrl+T in a
+  panel did nothing visible, and Ctrl+Shift+T could bring back a closed
+  panel's page.
+- The find bar (Ctrl+F) in a web panel stays docked below the page, even
+  with a theme, mod or `userChrome.css` that makes the find bar float, which
+  in a panel covered half the page.
+
 ## [1.2.5] - 2026-09-24
 
 ### Fixed

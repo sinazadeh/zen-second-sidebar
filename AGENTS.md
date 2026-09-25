@@ -250,6 +250,18 @@ exports.
   panels. Its startup observers, SessionStore handling, close commands, popup
   notifications, and URL-bar patches are part of the implementation.
   Validate changes to this code in a real browser instance.
+- Keyboard shortcuts pressed in a web panel run in the nested window's own
+  keysets (Zen rebuilds them from its shortcut settings, so don't edit its
+  `<key>` elements). Commands that act on the browser window rather than the
+  page (`MAIN_WINDOW_COMMANDS` in `xul/web_panels_browser.mjs`: new tab,
+  reopen closed tab, address bar, web search) are caught in that window
+  (capturing `command` listener) and run on the main window's matching
+  `<command>` instead: otherwise Zen opens its new-tab address bar in the
+  hidden window, and reopening a closed tab can restore a panel's own tab.
+  Page commands (find, reload, zoom, print) stay in the panel. The nested
+  window also gets an agent-level sheet (`WindowWrapper#loadAgentSheet`)
+  keeping the find bar docked, since mods load their CSS as user sheets
+  with `!important`.
 - Mouse events inside a web panel bubble from that nested window up to the
   main window's listeners (its `<browser>` is the nested window's chrome
   event handler), so `event.target` can belong to the panel's document (see
