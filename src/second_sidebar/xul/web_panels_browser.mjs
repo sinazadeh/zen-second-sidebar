@@ -26,6 +26,48 @@ const WEBAUTHN_PROMPT_EVENT = "webauthn-prompt";
 
 const FIRST_TAB_INDEX = 0;
 
+// Commands for the browser window rather than the page. Run in the panels'
+// hidden window, they'd act on it instead of the one the user sees: Zen
+// opens its new-tab address bar there, where it can't be seen, and
+// reopening a closed tab would bring back a web panel's own tab.
+const MAIN_WINDOW_COMMANDS = new Set([
+  "cmd_newNavigatorTab",
+  "cmd_newNavigatorTabNoEvent",
+  "History:UndoCloseTab",
+  "History:RestoreLastClosedTabOrWindowOrSession",
+  "Browser:OpenLocation",
+  "Tools:Search",
+]);
+
+// Themes and mods that float the find bar size and place it against the
+// whole window, which in a narrow panel covers half the page. Keep it
+// docked below the page, as Firefox lays it out. Loaded as an agent sheet,
+// so it wins over their `!important` rules.
+const DOCKED_FINDBAR_CSS = `
+  .browserContainer > findbar {
+    position: static !important;
+    inset: auto !important;
+    grid-area: findbar !important;
+    place-self: stretch !important;
+    width: auto !important;
+    min-width: 1px !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    transform: none !important;
+    translate: none !important;
+    scale: none !important;
+    margin-inline: 0 !important;
+    margin-top: 0 !important;
+    z-index: auto !important;
+  }
+
+  .browserContainer > findbar:not([hidden]) {
+    margin-bottom: 0 !important;
+  }
+`;
+
 export class WebPanelsBrowser extends Browser {
   constructor() {
     super({
@@ -221,6 +263,9 @@ export class WebPanelsBrowser extends Browser {
     // Add class for userChrome.css
     windowRoot.addClass("sb2-webpanels-window");
 
+    this.window.loadAgentSheet(DOCKED_FINDBAR_CSS);
+    this.#runWindowCommandsInMainWindow();
+
     // Close first dialog window within first 5 seconds
     this.#listenToFirstDialogAndClose();
 
@@ -229,6 +274,27 @@ export class WebPanelsBrowser extends Browser {
 
     // Patch #urlbar-input
     UrlbarInputPatcher.patch();
+  }
+
+  #runWindowCommandsInMainWindow() {
+    this.window.document.addEventListener(
+      "command",
+      (event) => {
+        const id = event.target?.id;
+        if (!MAIN_WINDOW_COMMANDS.has(id)) {
+          return;
+        }
+        const mainWindowCommand = document.getElementById(id);
+        if (!mainWindowCommand) {
+          return;
+        }
+        // Capturing on the document stops this window's own handlers
+        // (on the command and its commandset) from running it too.
+        event.stopPropagation();
+        mainWindowCommand.doCommand();
+      },
+      true,
+    );
   }
 
   #listenToFirstDialogAndClose() {

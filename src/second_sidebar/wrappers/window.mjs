@@ -118,6 +118,21 @@ export class WindowWrapper {
     this.raw.removeEventListener(type, listener);
   }
 
+  /**
+   * Adds CSS to this window at the user-agent level, which wins over
+   * `!important` rules in userChrome.css and Sine mods (user level) as well
+   * as the window's own styles.
+   *
+   * @param {string} css
+   */
+  loadAgentSheet(css) {
+    const windowUtils = this.raw.windowUtils;
+    windowUtils.loadSheetUsingURIString(
+      `data:text/css;charset=utf-8,${encodeURIComponent(css)}`,
+      windowUtils.AGENT_SHEET,
+    );
+  }
+
   relinkTreeOwner() {
     this.raw.docShell.treeOwner
       .QueryInterface(Ci.nsIInterfaceRequestor)
