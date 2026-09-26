@@ -6,6 +6,14 @@ below (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
 
+### Added
+
+- New Web Panel has a **Preset** list with the sidebars of installed
+  extensions, such as Bitwarden, so they can be added without looking up the
+  extension's `moz-extension://` address (which differs in every profile).
+- Web panels showing an extension page (`moz-extension://`) now get the
+  extension's own icon instead of a generic one.
+
 ## [1.2.7] - 2026-09-25
 
 ### Fixed

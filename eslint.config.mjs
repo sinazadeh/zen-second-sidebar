@@ -31,6 +31,7 @@ export default [
         SessionStore: "readonly",
         SidebarController: "readonly",
         UC_API: "readonly",
+        WebExtensionPolicy: "readonly",
         ZoomManager: "readonly",
       },
     },

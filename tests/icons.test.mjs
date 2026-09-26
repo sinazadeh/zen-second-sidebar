@@ -18,7 +18,11 @@ globalThis.Image = class {
 globalThis.NetUtil = {
   newURI(url) {
     const parsed = new URL(url);
-    return { specIgnoringRef: url.split("#")[0], host: parsed.host };
+    return {
+      scheme: parsed.protocol.slice(0, -1),
+      specIgnoringRef: url.split("#")[0],
+      host: parsed.host,
+    };
   },
 };
 globalThis.Favicons = {
@@ -26,6 +30,19 @@ globalThis.Favicons = {
   async getFaviconForPage(uri) {
     const spec = favicons.get(uri.specIgnoringRef);
     return spec ? { uri: { spec } } : null;
+  },
+};
+// Internal UUID -> manifest of an installed extension.
+const extensions = new Map();
+globalThis.WebExtensionPolicy = {
+  getByHostname(hostname) {
+    const manifest = extensions.get(hostname);
+    return manifest
+      ? {
+          extension: { manifest },
+          getURL: (path) => new URL(path, `moz-extension://${hostname}/`).href,
+        }
+      : null;
   },
 };
 Services.prefs ??= { prefHasUserValue: () => false };
@@ -42,6 +59,7 @@ const GOOGLE =
 beforeEach(() => {
   loadable.clear();
   favicons.clear();
+  extensions.clear();
 });
 
 test("uses the copy of the favicon stored in Places first", async () => {
@@ -89,4 +107,19 @@ test("firstLoadableIcon skips empty and broken entries", async () => {
     "chrome://ok.svg",
   );
   assert.equal(await firstLoadableIcon([""]), FALLBACK_ICON);
+});
+
+test("extension pages use the extension's own icon", async () => {
+  const uuid = "7dac8263-f522-4a51-a6fc-3d83fdfde20e";
+  const icon = `moz-extension://${uuid}/images/icon32.png`;
+  extensions.set(uuid, {
+    icons: { 16: "images/icon16.png", 32: "images/icon32.png" },
+  });
+  loadable.add(icon);
+  assert.equal(
+    await fetchIconURL(
+      `moz-extension://${uuid}/popup/index.html?uilocation=sidebar#/tabs/vault`,
+    ),
+    icon,
+  );
 });

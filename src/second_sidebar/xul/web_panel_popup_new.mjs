@@ -20,7 +20,10 @@ import { PopupHeader } from "./popup_header.mjs";
 import { ScriptSecurityManagerWrapper } from "../wrappers/script_security_manager.mjs";
 import { Toggle } from "./base/toggle.mjs";
 import { ToolbarSeparator } from "./base/toolbar_separator.mjs";
+import { getExtensionSidebarPanels } from "../utils/extension_panels.mjs";
 import { isLeftMouseButton } from "../utils/buttons.mjs";
+
+const CUSTOM_PRESET = "custom";
 
 export class WebPanelPopupNew extends Panel {
   constructor() {
@@ -30,6 +33,11 @@ export class WebPanelPopupNew extends Panel {
     });
     this.setType("arrow").setRole("group");
 
+    this.presetMenuList = createMenuList({
+      id: "sb2-web-panel-preset-menu-list",
+    });
+    this.presetGroup = createPopupGroup("Preset", this.presetMenuList);
+    this.presetSeparator = new ToolbarSeparator();
     this.input = createInput({ placeholder: "Web page URL" });
     this.containerMenuList = createMenuList({ id: "sb2-container-menu-list" });
     this.temporaryToggle = new Toggle();
@@ -41,6 +49,18 @@ export class WebPanelPopupNew extends Panel {
     this.addEventListener("popupshown", () => {
       this.input.focus();
     });
+
+    // A preset fills in the URL; editing it by hand makes it custom again.
+    this.presetMenuList.addEventListener("command", () => {
+      const url = this.presetMenuList.getValue();
+      this.input.setValue(url === CUSTOM_PRESET ? this.suggest : url);
+      this.input.focus();
+    });
+    this.input.addEventListener("input", () => {
+      if (this.presetMenuList.getValue() !== this.input.getValue()) {
+        this.presetMenuList.setValue(CUSTOM_PRESET);
+      }
+    });
   }
 
   #compose() {
@@ -49,6 +69,8 @@ export class WebPanelPopupNew extends Panel {
         new PopupHeader("New Web Panel"),
         new PopupBody().appendChildren(
           createPopupSet("", [
+            this.presetGroup,
+            this.presetSeparator,
             createPopupRow(this.input),
             new ToolbarSeparator(),
             createPopupGroup("Multi-Account Container", this.containerMenuList),
@@ -111,7 +133,9 @@ export class WebPanelPopupNew extends Panel {
    * @returns {WebPanelPopupNew}
    */
   openPopup(target, suggest) {
+    this.suggest = suggest;
     this.input.setValue(suggest);
+    this.#fillPresetMenuList();
 
     fillContainerMenuList(this.containerMenuList);
     this.containerMenuList.setValue(
@@ -125,5 +149,33 @@ export class WebPanelPopupNew extends Panel {
     this.temporaryToggle.setPressed(false);
 
     return Panel.prototype.openPopupWithinWindow.call(this, target);
+  }
+
+  /**
+   * Lists the sidebar pages of installed extensions (e.g. Bitwarden), which
+   * are looked up each time since extensions can be added or removed.
+   */
+  #fillPresetMenuList() {
+    let panels = [];
+    try {
+      panels = getExtensionSidebarPanels();
+    } catch (error) {
+      console.error("Failed to list extension sidebars:", error);
+    }
+
+    this.presetMenuList.removeAllItems();
+    this.presetMenuList.appendItem("Custom URL", CUSTOM_PRESET);
+    for (const panel of panels) {
+      this.presetMenuList.appendItem(panel.name, panel.url);
+      if (panel.iconURL) {
+        const menuItem = this.presetMenuList.getLastMenuItemXUL();
+        menuItem.classList.add("menuitem-iconic");
+        menuItem.setAttribute("image", panel.iconURL);
+      }
+    }
+    this.presetMenuList.setValue(CUSTOM_PRESET);
+
+    this.presetGroup.toggleHidden(panels.length === 0);
+    this.presetSeparator.toggleHidden(panels.length === 0);
   }
 }

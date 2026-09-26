@@ -6,6 +6,7 @@
 > - Full Zen Browser layout support (vertical tabs, split view, workspaces, compact mode, and both sidebar sides) alongside standard Firefox.
 > - Web panel setting: `Reload when address changes` — reloads a web panel when the main browser's active tab is switched or navigated to a different site. For example, with a Bitwarden panel this reloads its vault view as you switch tabs, so it's always showing logins for whichever site you're currently on.
 > - Web panel setting: `Unload after inactivity` — automatically unloads a panel that's been in the background for a set time, without relying on Firefox's own background tab unloader (which isn't reliable for panels living in the hidden window that hosts them).
+> - Extension sidebars (e.g. Bitwarden) as web panel presets — see [Extension sidebars in a web panel](#extension-sidebars-in-a-web-panel-eg-bitwarden).
 > - Sidebar setting: `Export settings` / `Import settings` — back up or restore the sidebar and all web panel settings as a single JSON file.
 > - [Sine](https://github.com/CosmoCreeper/Sine) mod support (`theme.json`) alongside fx-autoconfig, so the script can be installed without manually copying files.
 > - Windows GPU compositing fix so web panels don't render as a blank frame when switching.
@@ -44,29 +45,35 @@ Pick whichever loader you already use (or prefer) — both install the exact sam
 
 Right-click the sidebar and choose **Sidebar settings**. With Sine, the same settings are also on Sine's mod page: click the gear button of **Zen Second Sidebar Enhanced**. Changes there apply right away, like in the popup. Keyboard shortcuts and settings export/import are only in the popup.
 
-## Bitwarden in a web panel
+## Extension sidebars in a web panel (e.g. Bitwarden)
 
-An extension's sidebar page can be opened as a web panel. For Bitwarden, both the panel address and its icon contain values that are different for every profile, so you need to look them up once:
+Extensions that have a sidebar, such as Bitwarden, can be opened in a web panel:
 
-1. **Find Bitwarden's internal UUID.** Open `about:debugging#/runtime/this-firefox`, find **Bitwarden** under _Extensions_ and copy its **Internal UUID** (for example `7dac8263-f522-4a51-a6fc-3d83fdfde20e`). Each profile gives the extension its own random UUID, so look it up again on another profile or after reinstalling Bitwarden.
-2. **Build the panel URL** by putting your UUID into:
+1. Click the sidebar's **New Web Panel** (**+**) button.
+2. Pick the extension from **Preset**. This fills in its sidebar page, e.g. `moz-extension://<internal-uuid>/popup/index.html?uilocation=sidebar` for Bitwarden.
+3. Click **Create**. The panel's button uses the extension's own icon.
+
+For Bitwarden, you can also turn on **Reload when address changes** (right-click the panel's button → **Edit web panel**) so the vault always shows the logins for the site in your current tab.
+
+### Adding it by hand
+
+**Preset** only lists extensions that declare a sidebar page. To open another extension page, or a different page of one (Bitwarden's vault tab, for example), enter its address as a custom URL:
+
+1. **Find the extension's internal UUID.** Open `about:debugging#/runtime/this-firefox`, find the extension under _Extensions_ and copy its **Internal UUID** (for example `7dac8263-f522-4a51-a6fc-3d83fdfde20e`). Each profile gives an extension its own random UUID, so look it up again on another profile or after reinstalling the extension.
+2. **Build the panel URL** by putting your UUID into the page's address. For Bitwarden's vault:
    ```
    moz-extension://<internal-uuid>/popup/index.html?uilocation=sidebar#/tabs/vault
    ```
    `uilocation=sidebar` makes Bitwarden lay itself out as a sidebar, and `#/tabs/vault` opens the vault tab.
-3. **Find your profile folder.** Open `about:support` and look at _Profile Folder_ (or click **Open Folder** / **Show in Finder** next to it).
-4. **Build the icon URL.** Extensions are stored as `.xpi` files in your profile's `extensions` folder, and Bitwarden's file is always named `{446900e4-71c2-419f-a6a7-df9c091e268b}.xpi`. Take your profile folder path, turn every `\` into `/` and every space into `%20`, and put it into:
-   ```
-   jar:file:///<profile-folder>/extensions/{446900e4-71c2-419f-a6a7-df9c091e268b}.xpi!/images/icon32.png
-   ```
-   For example, with the Windows profile folder `C:\Users\Me\AppData\Roaming\zen\Profiles\abcd1234.Default (release)`:
-   ```
-   jar:file:///C:/Users/Me/AppData/Roaming/zen/Profiles/abcd1234.Default%20(release)/extensions/{446900e4-71c2-419f-a6a7-df9c091e268b}.xpi!/images/icon32.png
-   ```
-   On Linux or macOS the profile folder already starts with `/`, so it becomes `jar:file:///home/me/...`. Pasting this URL into the address bar should show the Bitwarden logo; if it doesn't, check the path.
-5. **Add the panel.** Click the sidebar's **New Web Panel** (**+**) button, paste the panel URL from step 2 into **Web page URL** and click **Create**. Then right-click the new panel's button, choose **Edit web panel**, paste the icon URL from step 4 into **Favicon URL** and click **Save**.
+3. **Add the panel** with **New Web Panel**, entering this URL. Its icon is picked up from the extension as well.
 
-Optionally, turn on **Reload when address changes** in the same dialog so the vault always shows the logins for the site in your current tab.
+If the button still shows a generic icon, you can point **Favicon URL** (in **Edit web panel**) at the icon inside the extension's `.xpi` file, which is in the `extensions` folder of your profile (`about:support` → _Profile Folder_). Bitwarden's file is always named `{446900e4-71c2-419f-a6a7-df9c091e268b}.xpi`. Turn every `\` in the profile folder path into `/` and every space into `%20`, for example:
+
+```
+jar:file:///C:/Users/Me/AppData/Roaming/zen/Profiles/abcd1234.Default%20(release)/extensions/{446900e4-71c2-419f-a6a7-df9c091e268b}.xpi!/images/icon32.png
+```
+
+On Linux or macOS the profile folder already starts with `/`, so it becomes `jar:file:///home/me/...`. Pasting the URL into the address bar should show the icon; if it doesn't, check the path.
 
 ## Backup
 

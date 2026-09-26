@@ -1,6 +1,7 @@
 import { FaviconsWrapper } from "../wrappers/favicons.mjs";
 import { Logger } from "./logger.mjs";
 import { NetUtilWrapper } from "../wrappers/net_utils.mjs";
+import { getExtensionIconURLForPage } from "./extension_panels.mjs";
 
 const PREDEFINED_ICONS = {
   "about:newtab": "chrome://branding/content/icon32.png",
@@ -63,7 +64,8 @@ export async function firstLoadableIcon(urls) {
 }
 
 /**
- * Finds an icon for a page, trying in order: the copy of its favicon stored
+ * Finds an icon for a page, trying in order: the extension's own icon for an
+ * extension page (`moz-extension:`), the copy of its favicon stored
  * in Places (read locally, so it shows even when the icon's own server
  * can't be reached from here), that favicon's own URL, Google's favicon
  * service, and finally FALLBACK_ICON, using the first that actually loads.
@@ -98,6 +100,7 @@ export async function fetchIconURL(url, { local = true } = {}) {
   }
 
   const iconURL = await firstLoadableIcon([
+    getExtensionIconURLForPage(uri),
     local && faviconURL ? `cached-favicon:${faviconURL}` : null,
     faviconURL,
     host ? `https://www.google.com/s2/favicons?domain=${host}&sz=32` : null,
