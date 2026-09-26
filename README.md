@@ -44,6 +44,30 @@ Pick whichever loader you already use (or prefer) — both install the exact sam
 
 Right-click the sidebar and choose **Sidebar settings**. With Sine, the same settings are also on Sine's mod page: click the gear button of **Zen Second Sidebar Enhanced**. Changes there apply right away, like in the popup. Keyboard shortcuts and settings export/import are only in the popup.
 
+## Bitwarden in a web panel
+
+An extension's sidebar page can be opened as a web panel. For Bitwarden, both the panel address and its icon contain values that are different for every profile, so you need to look them up once:
+
+1. **Find Bitwarden's internal UUID.** Open `about:debugging#/runtime/this-firefox`, find **Bitwarden** under _Extensions_ and copy its **Internal UUID** (for example `7dac8263-f522-4a51-a6fc-3d83fdfde20e`). Each profile gives the extension its own random UUID, so look it up again on another profile or after reinstalling Bitwarden.
+2. **Build the panel URL** by putting your UUID into:
+   ```
+   moz-extension://<internal-uuid>/popup/index.html?uilocation=sidebar#/tabs/vault
+   ```
+   `uilocation=sidebar` makes Bitwarden lay itself out as a sidebar, and `#/tabs/vault` opens the vault tab.
+3. **Find your profile folder.** Open `about:support` and look at _Profile Folder_ (or click **Open Folder** / **Show in Finder** next to it).
+4. **Build the icon URL.** Extensions are stored as `.xpi` files in your profile's `extensions` folder, and Bitwarden's file is always named `{446900e4-71c2-419f-a6a7-df9c091e268b}.xpi`. Take your profile folder path, turn every `\` into `/` and every space into `%20`, and put it into:
+   ```
+   jar:file:///<profile-folder>/extensions/{446900e4-71c2-419f-a6a7-df9c091e268b}.xpi!/images/icon32.png
+   ```
+   For example, with the Windows profile folder `C:\Users\Me\AppData\Roaming\zen\Profiles\abcd1234.Default (release)`:
+   ```
+   jar:file:///C:/Users/Me/AppData/Roaming/zen/Profiles/abcd1234.Default%20(release)/extensions/{446900e4-71c2-419f-a6a7-df9c091e268b}.xpi!/images/icon32.png
+   ```
+   On Linux or macOS the profile folder already starts with `/`, so it becomes `jar:file:///home/me/...`. Pasting this URL into the address bar should show the Bitwarden logo; if it doesn't, check the path.
+5. **Add the panel.** Click the sidebar's **New Web Panel** (**+**) button, paste the panel URL from step 2 into **Web page URL** and click **Create**. Then right-click the new panel's button, choose **Edit web panel**, paste the icon URL from step 4 into **Favicon URL** and click **Save**.
+
+Optionally, turn on **Reload when address changes** in the same dialog so the vault always shows the logins for the site in your current tab.
+
 ## Backup
 
 Use **Export settings** / **Import settings** (sidebar settings popup) to save or restore the sidebar and every web panel's settings as one JSON file. This covers configuration only, not per-panel state like the last-opened URL. Importing checks the file, writes its settings to disk and offers to restart the browser, which is when they take effect. Until the restart, other changes to the sidebar or web panels aren't saved, so they can't overwrite the import.
