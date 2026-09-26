@@ -54,12 +54,14 @@ test("lists extensions with a sidebar page, sorted by name", () => {
       id: "Aardvark@example.com",
       name: "Aardvark",
       url: "moz-extension://uuid-aardvark/sidebar.html",
+      baseURL: "moz-extension://uuid-aardvark/",
       iconURL: "moz-extension://uuid-aardvark/medium.png",
     },
     {
       id: "Bitwarden@example.com",
       name: "Bitwarden",
       url: "moz-extension://uuid-bitwarden/popup/index.html?uilocation=sidebar",
+      baseURL: "moz-extension://uuid-bitwarden/",
       iconURL: "moz-extension://uuid-bitwarden/images/icon32.png",
     },
   ]);

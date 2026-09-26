@@ -8,9 +8,11 @@ below (see `.github/workflows/release.yml`).
 
 ### Added
 
-- New Web Panel has a **Preset** list with the sidebars of installed
-  extensions, such as Bitwarden, so they can be added without looking up the
-  extension's `moz-extension://` address (which differs in every profile).
+- New Web Panel has a **Preset** list: common websites (ChatGPT, Claude,
+  WhatsApp, Telegram, X...), in mobile view where that works better, and the
+  sidebars of installed extensions, such as Bitwarden's vault, without
+  looking up the extension's `moz-extension://` address (which differs in
+  every profile). A preset only sets the URL, mobile view and favicon.
 - Web panels showing an extension page (`moz-extension://`) now get the
   extension's own icon instead of a generic one.
 

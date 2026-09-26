@@ -127,6 +127,7 @@ export class WebPanelsController {
         url,
         userContextId,
         temporary,
+        presetSettings,
         newWebPanelPosition,
         isActiveWindow,
       } = event.detail;
@@ -139,6 +140,7 @@ export class WebPanelsController {
           temporary,
           newWebPanelPosition,
           isActiveWindow,
+          presetSettings,
         );
       };
 
@@ -565,6 +567,8 @@ export class WebPanelsController {
    * @param {boolean} temporary
    * @param {string} newWebPanelPosition
    * @param {boolean} isActiveWindow
+   * @param {import("../utils/web_panel_presets.mjs").WebPanelPresetSettings} [presetSettings]
+   *   Settings of the preset the panel was created from, if any.
    * @returns {Promise<WebPanelController?>} null if `url` is invalid
    */
   async createWebPanelController(
@@ -574,6 +578,7 @@ export class WebPanelsController {
     temporary,
     newWebPanelPosition,
     isActiveWindow,
+    { mobile, dynamicFavicon, faviconURL } = {},
   ) {
     try {
       NetUtilWrapper.newURI(url);
@@ -590,6 +595,10 @@ export class WebPanelsController {
       {
         userContextId,
         temporary,
+        // undefined (no preset) keeps WebPanelSettings' own defaults.
+        mobile,
+        dynamicFavicon,
+        faviconURL,
       },
     );
     const webPanelState = new WebPanelState(uuid);

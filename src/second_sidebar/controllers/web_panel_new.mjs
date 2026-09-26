@@ -14,8 +14,8 @@ export class WebPanelNewController {
     });
 
     SidebarElements.webPanelPopupNew.listenSaveButtonClick(
-      async (url, userContextId, temporary) => {
-        this.createWebPanel(url, userContextId, temporary);
+      async (url, userContextId, temporary, presetSettings) => {
+        this.createWebPanel(url, userContextId, temporary, presetSettings);
         this.hidePopup();
       },
     );
@@ -30,14 +30,17 @@ export class WebPanelNewController {
    * @param {string} url
    * @param {number} userContextId
    * @param {boolean} temporary
+   * @param {import("../utils/web_panel_presets.mjs").WebPanelPresetSettings} [presetSettings]
+   *   Settings of the preset the panel was created from, if any.
    */
-  createWebPanel(url, userContextId, temporary) {
+  createWebPanel(url, userContextId, temporary, presetSettings = {}) {
     const uuid = crypto.randomUUID();
     sendEvents(WebPanelEvents.CREATE_WEB_PANEL, {
       uuid,
       url,
       userContextId,
       temporary,
+      presetSettings,
       newWebPanelPosition: this.newWebPanelPosition,
     });
   }

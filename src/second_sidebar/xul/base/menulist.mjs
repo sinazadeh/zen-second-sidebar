@@ -44,6 +44,17 @@ export class MenuList extends XULElement {
    *
    * @returns {MenuList}
    */
+  appendSeparator() {
+    this.element.menupopup.appendChild(
+      document.createXULElement("menuseparator"),
+    );
+    return this;
+  }
+
+  /**
+   *
+   * @returns {MenuList}
+   */
   removeAllItems() {
     this.element.removeAllItems();
     return this;

@@ -8,6 +8,7 @@ const PREFERRED_ICON_SIZE = 32;
  * @property {string} name
  * @property {string} url Its sidebar page, e.g.
  *   `moz-extension://<internal-uuid>/popup/index.html?uilocation=sidebar`.
+ * @property {string} baseURL `moz-extension://<internal-uuid>/`.
  * @property {string?} iconURL
  */
 
@@ -67,6 +68,7 @@ export function getExtensionSidebarPanels() {
       id: policy.id,
       name: policy.name,
       url: policy.getURL(panel),
+      baseURL: policy.getURL(""),
       iconURL: getIconURL(policy),
     });
   }
