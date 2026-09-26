@@ -578,7 +578,7 @@ export class WebPanelsController {
     temporary,
     newWebPanelPosition,
     isActiveWindow,
-    { mobile, dynamicFavicon, faviconURL } = {},
+    { mobile, dynamicFavicon, faviconURL, reloadOnUrlChange } = {},
   ) {
     try {
       NetUtilWrapper.newURI(url);
@@ -599,6 +599,7 @@ export class WebPanelsController {
         mobile,
         dynamicFavicon,
         faviconURL,
+        reloadOnUrlChange,
       },
     );
     const webPanelState = new WebPanelState(uuid);

@@ -7,6 +7,7 @@ import { getExtensionSidebarPanels } from "./extension_panels.mjs";
  * @property {boolean} [mobile]
  * @property {boolean} [dynamicFavicon]
  * @property {string} [faviconURL]
+ * @property {boolean} [reloadOnUrlChange]
  */
 
 /**
@@ -48,16 +49,19 @@ const WEBSITES = [
 ];
 
 /**
- * Extension sidebar pages to open somewhere other than their declared
- * `sidebar_action.default_panel`, keyed by extension id and relative to the
- * extension's base URL (`moz-extension://<internal-uuid>/`).
+ * Adjustments for particular extensions, keyed by extension id: `page`
+ * replaces the declared `sidebar_action.default_panel` (relative to the
+ * extension's base URL, `moz-extension://<internal-uuid>/`).
  *
- * @type {Object<string, string>}
+ * @type {Object<string, {page?: string, reloadOnUrlChange?: boolean}>}
  */
-const EXTENSION_PAGES = {
-  // Bitwarden: straight to the vault tab.
-  "{446900e4-71c2-419f-a6a7-df9c091e268b}":
-    "popup/index.html?uilocation=sidebar#/tabs/vault",
+const EXTENSION_OVERRIDES = {
+  // Bitwarden: straight to the vault tab, reloaded as the current tab's
+  // site changes so it lists that site's logins.
+  "{446900e4-71c2-419f-a6a7-df9c091e268b}": {
+    page: "popup/index.html?uilocation=sidebar#/tabs/vault",
+    reloadOnUrlChange: true,
+  },
 };
 
 /**
@@ -68,7 +72,7 @@ export function getWebsitePresets() {
     id: `website:${url}`,
     name,
     url,
-    settings: { mobile, dynamicFavicon: true },
+    settings: { mobile, dynamicFavicon: true, reloadOnUrlChange: false },
   }));
 }
 
@@ -82,15 +86,19 @@ export function getWebsitePresets() {
 export function getExtensionPresets() {
   return getExtensionSidebarPanels().map(
     ({ id, name, url, baseURL, iconURL }) => {
-      const page = EXTENSION_PAGES[id];
+      const { page, reloadOnUrlChange = false } = EXTENSION_OVERRIDES[id] ?? {};
       return {
         id: `extension:${id}`,
         name,
         url: page ? new URL(page, baseURL).href : url,
         iconURL,
-        settings: iconURL
-          ? { mobile: false, dynamicFavicon: false, faviconURL: iconURL }
-          : { mobile: false, dynamicFavicon: true },
+        settings: {
+          mobile: false,
+          ...(iconURL
+            ? { dynamicFavicon: false, faviconURL: iconURL }
+            : { dynamicFavicon: true }),
+          reloadOnUrlChange,
+        },
       };
     },
   );

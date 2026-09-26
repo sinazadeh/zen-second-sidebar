@@ -34,7 +34,7 @@ const { getExtensionPresets, getWebsitePresets } =
 const { WebPanelSettings } =
   await import("../src/second_sidebar/settings/web_panel_settings.mjs");
 
-test("website presets only set the URL, mobile view and dynamic favicon", () => {
+test("website presets only set the URL, mobile view, favicon and reloading", () => {
   const presets = getWebsitePresets();
   assert.ok(presets.length > 0);
   for (const preset of presets) {
@@ -42,6 +42,7 @@ test("website presets only set the URL, mobile view and dynamic favicon", () => 
     assert.deepEqual(Object.keys(preset.settings).sort(), [
       "dynamicFavicon",
       "mobile",
+      "reloadOnUrlChange",
     ]);
     assert.equal(preset.settings.dynamicFavicon, true);
   }
@@ -66,11 +67,16 @@ test("extension presets keep the extension's icon fixed", () => {
       mobile: false,
       dynamicFavicon: false,
       faviconURL: "moz-extension://uuid-bw/images/icon32.png",
+      reloadOnUrlChange: true,
     },
   });
   // Without an icon to fix, the page's own one is still better than nothing.
   assert.equal(iconless.url, "moz-extension://uuid-iconless/sidebar.html");
-  assert.deepEqual(iconless.settings, { mobile: false, dynamicFavicon: true });
+  assert.deepEqual(iconless.settings, {
+    mobile: false,
+    dynamicFavicon: true,
+    reloadOnUrlChange: false,
+  });
 });
 
 test("settings a preset leaves out keep their defaults", () => {
@@ -78,8 +84,10 @@ test("settings a preset leaves out keep their defaults", () => {
     mobile: undefined,
     dynamicFavicon: undefined,
     faviconURL: undefined,
+    reloadOnUrlChange: undefined,
   });
   assert.equal(settings.mobile, false);
   assert.equal(settings.dynamicFavicon, true);
   assert.equal(settings.faviconURL, "");
+  assert.equal(settings.reloadOnUrlChange, false);
 });

@@ -12,7 +12,8 @@ below (see `.github/workflows/release.yml`).
   WhatsApp, Telegram, X...), in mobile view where that works better, and the
   sidebars of installed extensions, such as Bitwarden's vault, without
   looking up the extension's `moz-extension://` address (which differs in
-  every profile). A preset only sets the URL, mobile view and favicon.
+  every profile). A preset only sets the URL, mobile view, favicon and
+  whether the panel reloads when the address changes (on for Bitwarden).
 - Web panels showing an extension page (`moz-extension://`) now get the
   extension's own icon instead of a generic one.
 

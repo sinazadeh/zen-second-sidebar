@@ -50,13 +50,11 @@ Right-click the sidebar and choose **Sidebar settings**. With Sine, the same set
 When adding a web panel with **New Web Panel** (**+**), **Preset** offers:
 
 - **Common websites** such as ChatGPT, Claude, Gemini, WhatsApp, Telegram and X. Sites that work better that way (e.g. Telegram, X) open in mobile view.
-- **Installed extensions' sidebars**, such as Bitwarden's (which opens on its vault). The panel keeps the extension's own icon, as these pages don't set one.
+- **Installed extensions' sidebars**, such as Bitwarden's. The panel keeps the extension's own icon, as these pages don't set one. Bitwarden opens on its vault with **Reload when address changes** on, so the vault always shows the logins for the site in your current tab.
 
-Picking one fills in its URL; editing the URL afterwards turns it back into a custom one. A preset only sets the URL, mobile view and the favicon; everything else (size, position, toolbar, unloading...) starts from the usual defaults, and all of it can be changed later in **Edit web panel**.
+Picking one fills in its URL; editing the URL afterwards turns it back into a custom one. A preset only sets the URL, mobile view, favicon and whether the panel reloads when the address changes. Everything else (size, position, toolbar, unloading...) starts from the usual defaults, and all of it can be changed later in **Edit web panel** (right-click the panel's button).
 
-For Bitwarden, also consider turning on **Reload when address changes** (right-click the panel's button → **Edit web panel**) so the vault always shows the logins for the site in your current tab.
-
-### Adding an extension page by hand
+### Adding an extension manually
 
 **Preset** only lists extensions that declare a sidebar page. To open another extension page, or a different page of one, enter its address as a custom URL:
 
@@ -66,7 +64,7 @@ For Bitwarden, also consider turning on **Reload when address changes** (right-c
    moz-extension://<internal-uuid>/popup/index.html?uilocation=sidebar#/tabs/vault
    ```
    `uilocation=sidebar` makes Bitwarden lay itself out as a sidebar, and `#/tabs/vault` opens the vault tab.
-3. **Add the panel** with **New Web Panel**, entering this URL. Its icon is picked up from the extension as well; if the page later shows a generic icon, turn off **Dynamic** favicon in **Edit web panel**.
+3. **Add the panel** with **New Web Panel**, entering this URL. Its icon is picked up from the extension as well; if the page later shows a generic icon, turn off **Dynamic** favicon in **Edit web panel**. For Bitwarden, also turn on **Reload when address changes** there.
 
 If the button still shows a generic icon, you can point **Favicon URL** (in **Edit web panel**) at the icon inside the extension's `.xpi` file, which is in the `extensions` folder of your profile (`about:support` → _Profile Folder_). Bitwarden's file is always named `{446900e4-71c2-419f-a6a7-df9c091e268b}.xpi`. Turn every `\` in the profile folder path into `/` and every space into `%20`, for example:
 
