@@ -6,6 +6,8 @@ below (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-09-26
+
 ### Added
 
 - New Web Panel has a **Preset** list: common websites (ChatGPT, Claude,
